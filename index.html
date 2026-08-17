@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="トレ記録">
+<meta name="theme-color" content="#0d1b2a">
+<title>トレーニング記録</title>
+<style>
+  :root{
+    --field:#12161c;        /* 背景(チャコール) */
+    --field2:#1b212a;       /* パネル背景 */
+    --line:#eef1f4;         /* 明るい面・数字 */
+    --line-dim:#5c6672;     /* 補助線・弱い要素 */
+    --accent:#4cb782;       /* アクセント(落ち着いた緑) */
+    --accent-soft:#6fd0a0;
+    --done:#eef1f4;         /* やった日の丸 */
+    --ink:#e7ebf0;          /* 明るい文字 */
+    --ink-dim:#8b95a3;      /* 弱い文字 */
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #1c2530 0%, var(--field) 60%);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","游ゴシック体",YuGothic,"Yu Gothic",sans-serif;
+    min-height:100vh;
+    padding:
+      calc(env(safe-area-inset-top) + 20px)
+      16px
+      calc(env(safe-area-inset-bottom) + 32px);
+    display:flex;justify-content:center;
+  }
+  .wrap{width:100%;max-width:460px;}
+
+  header{text-align:center;margin-bottom:18px;}
+  .title{
+    font-size:15px;letter-spacing:.35em;color:var(--ink-dim);
+    font-weight:600;margin:0 0 2px;padding-left:.35em;
+  }
+  .sub{font-size:12px;color:var(--line-dim);letter-spacing:.15em;}
+
+  /* スコアボード風ストリーク */
+  .board{
+    background:linear-gradient(180deg,var(--field2),#161b23);
+    border:1px solid #2a323d;
+    border-radius:18px;
+    padding:22px 20px 20px;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+    box-shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  .board::before{ /* 上部アクセントライン */
+    content:"";position:absolute;top:0;left:0;right:0;height:3px;
+    background:var(--accent);
+    opacity:.9;
+  }
+  .streak-label{font-size:12px;letter-spacing:.3em;color:var(--ink-dim);margin-bottom:6px;}
+  .streak-num{
+    font-size:76px;line-height:1;font-weight:800;
+    font-variant-numeric:tabular-nums;
+    color:var(--line);
+    text-shadow:0 2px 12px rgba(0,0,0,.4);
+  }
+  .streak-num .unit{font-size:24px;font-weight:700;color:var(--ink-dim);margin-left:6px;}
+  .streak-msg{margin-top:10px;font-size:13px;color:var(--accent-soft);min-height:18px;font-weight:600;}
+  .streak-msg.calm{color:var(--ink-dim);font-weight:500;}
+
+  /* 今日やったボタン */
+  .cta{
+    margin:20px 0 6px;width:100%;border:none;border-radius:16px;
+    padding:20px;font-size:19px;font-weight:800;letter-spacing:.05em;
+    color:#0e2419;cursor:pointer;transition:transform .08s ease,filter .15s ease;
+    background:linear-gradient(180deg,var(--accent-soft),var(--accent));
+    box-shadow:0 8px 20px rgba(76,183,130,.3);
+  }
+  .cta:active{transform:translateY(2px) scale(.995);}
+  .cta.done{
+    background:linear-gradient(180deg,#242c37,#1b212a);
+    color:var(--line);box-shadow:none;border:1px solid #333d4a;
+  }
+  .cta.done .check{color:var(--accent-soft);margin-right:8px;}
+
+  .undo{
+    display:block;margin:4px auto 0;background:none;border:none;
+    color:var(--line-dim);font-size:13px;cursor:pointer;padding:8px;
+    text-decoration:underline;text-underline-offset:3px;
+  }
+  .undo:active{color:var(--ink-dim);}
+  .undo[hidden]{display:none;}
+
+  /* 今日のメニュー */
+  .menu{
+    margin-top:16px;background:var(--field2);border:1px solid #2a323d;
+    border-radius:16px;padding:16px 16px 6px;
+  }
+  .menu-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;}
+  .mnav{
+    flex:0 0 auto;background:transparent;border:1px solid #2a323d;color:var(--ink);
+    width:32px;height:32px;border-radius:9px;font-size:17px;line-height:1;cursor:pointer;padding:0;
+  }
+  .mnav:active{background:#252d38;}
+  .menu-head{
+    flex:1 1 auto;text-align:center;
+    font-size:13px;font-weight:700;color:var(--accent-soft);
+    letter-spacing:.05em;
+  }
+  .menu.rest .menu-head{color:var(--ink-dim);}
+  .menu-today{
+    display:block;margin:0 auto 12px;background:transparent;border:none;
+    color:var(--line-dim);font-size:13px;cursor:pointer;padding:4px 8px;
+    text-decoration:underline;text-underline-offset:3px;
+  }
+  .menu-today[hidden]{display:none;}
+  /* モード切り替え */
+  .mode-switch{
+    display:flex;gap:0;background:#161b23;border:1px solid #2a323d;
+    border-radius:10px;padding:3px;margin-bottom:12px;
+  }
+  .mode-btn{
+    flex:1;background:transparent;border:none;color:var(--ink-dim);
+    font-size:13px;font-weight:600;padding:8px;border-radius:8px;cursor:pointer;
+  }
+  .mode-btn.active{background:var(--accent);color:#0e2419;}
+  .circuit-note{
+    background:#161b23;border:1px solid #2a323d;border-radius:10px;
+    padding:10px 12px;margin-bottom:12px;font-size:12px;
+    color:var(--ink-dim);line-height:1.7;
+  }
+  .circuit-note[hidden]{display:none;}
+  .circuit-note b{color:var(--accent-soft);font-weight:700;}
+  .menu-rest-msg{color:var(--ink-dim);font-size:14px;padding-bottom:12px;}
+  .ex{
+    border-top:1px solid #262e38;
+  }
+  .ex:first-child{border-top:none;}
+  .ex-row{display:flex;align-items:flex-start;gap:10px;}
+  .chk{
+    flex:0 0 auto;margin-top:11px;
+    width:24px;height:24px;border-radius:7px;
+    border:1.5px solid #3a4553;background:transparent;
+    color:#0e2419;font-size:15px;line-height:1;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;
+    padding:0;transition:background .15s ease,border-color .15s ease;
+  }
+  .chk.on{background:var(--accent);border-color:var(--accent);}
+  .ex-btn{
+    flex:1 1 auto;min-width:0;
+    background:none;border:none;color:var(--ink);
+    text-align:left;padding:10px 2px;cursor:pointer;
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+  }
+  .ex-info{min-width:0;}
+  .ex-name{display:block;font-size:15px;font-weight:600;}
+  .ex-reps{display:block;font-size:12px;color:var(--ink-dim);margin-top:2px;}
+  .chk.on + .ex-btn .ex-name{color:var(--ink-dim);text-decoration:line-through;}
+  .ex-btn .arw{
+    color:var(--ink-dim);font-size:12px;flex:0 0 auto;
+    transition:transform .2s ease;
+  }
+  .ex-btn[aria-expanded="true"] .arw{transform:rotate(90deg);color:var(--accent-soft);}
+  .ex-desc{
+    display:none;color:var(--ink-dim);font-size:13px;line-height:1.7;
+    padding:0 2px 14px 36px;
+  }
+  .ex-desc.open{display:block;}
+  .menu-done{
+    text-align:center;color:var(--accent-soft);font-size:13px;
+    font-weight:700;padding:10px 0 6px;
+  }
+  .menu-done[hidden]{display:none;}
+  @media (prefers-reduced-motion: reduce){
+    .ex-btn .arw{transition:none;}
+    .chk{transition:none;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .ex-btn .arw{transition:none;}
+  }
+
+  /* 集計 */
+  .stats{display:flex;gap:12px;margin:16px 0;}
+  .stat{
+    flex:1;background:var(--field2);border:1px solid #2a323d;border-radius:14px;
+    padding:14px 10px;text-align:center;
+  }
+  .stat .n{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--line);}
+  .stat .l{font-size:11px;color:var(--ink-dim);letter-spacing:.1em;margin-top:2px;}
+
+  /* カレンダー */
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin:22px 4px 12px;}
+  .cal-title{font-size:15px;font-weight:700;letter-spacing:.05em;}
+  .nav{background:var(--field2);border:1px solid #2a323d;color:var(--ink);
+    width:36px;height:36px;border-radius:10px;font-size:18px;cursor:pointer;line-height:1;}
+  .nav:active{background:#252d38;}
+  .nav:disabled{opacity:.3;cursor:default;}
+
+  .dow{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px;}
+  .dow div{text-align:center;font-size:11px;color:var(--line-dim);padding:2px 0;}
+  .dow .sun{color:#c98b8b;}
+  .dow .sat{color:#89a7c4;}
+
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .cell{
+    aspect-ratio:1/1;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-variant-numeric:tabular-nums;
+    background:transparent;color:var(--ink-dim);position:relative;
+  }
+  .cell.empty{background:transparent;}
+  .cell.done{
+    background:var(--accent);color:#0e2419;font-weight:800;
+  }
+  .cell.today{outline:2px solid var(--accent);outline-offset:1px;}
+  .cell.rest{color:var(--line-dim);}
+
+  footer{margin-top:26px;text-align:center;color:var(--line-dim);font-size:11px;line-height:1.7;}
+  .footer-note{color:#4d6076;}
+
+  /* 統計グラフ */
+  .chart-card{
+    margin-top:22px;background:var(--field2);border:1px solid #2a323d;
+    border-radius:16px;padding:16px;
+  }
+  .chart-title{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:14px;letter-spacing:.05em;}
+  .chart{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;height:120px;}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end;}
+  .bar-val{font-size:12px;color:var(--ink-dim);font-variant-numeric:tabular-nums;}
+  .bar{
+    width:100%;max-width:34px;border-radius:6px 6px 0 0;
+    background:var(--accent);min-height:3px;transition:height .3s ease;
+  }
+  .bar.zero{background:#2a323d;}
+  .bar-label{font-size:11px;color:var(--line-dim);}
+  @media (prefers-reduced-motion: reduce){ .bar{transition:none;} }
+
+  /* バックアップ */
+  .backup{display:flex;gap:12px;margin-top:16px;}
+  .bk-btn{
+    flex:1;background:var(--field2);border:1px solid #2a323d;color:var(--ink);
+    border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .bk-btn:active{background:#252d38;}
+
+  /* 節目バナー */
+  .banner{
+    position:fixed;top:calc(env(safe-area-inset-top) + 12px);left:50%;
+    transform:translateX(-50%) translateY(-24px);
+    background:var(--accent);color:#0e2419;
+    font-size:15px;font-weight:800;letter-spacing:.03em;
+    padding:12px 22px;border-radius:999px;
+    box-shadow:0 8px 24px rgba(0,0,0,.4);
+    opacity:0;pointer-events:none;z-index:50;white-space:nowrap;
+    transition:opacity .3s ease, transform .3s ease;
+  }
+  .banner.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* 押下時に数字が弾む */
+  @keyframes pop{
+    0%{transform:scale(1);}
+    40%{transform:scale(1.18);}
+    100%{transform:scale(1);}
+  }
+  .streak-num.pop{animation:pop .4s ease;}
+
+  @media (prefers-reduced-motion: reduce){
+    .banner{transition:opacity .2s ease;}
+    .banner.show{transform:translateX(-50%) translateY(0);}
+    .streak-num.pop{animation:none;}
+  }
+</style>
+</head>
+<body>
+<div class="banner" id="banner" role="status" aria-live="polite"></div>
+<div class="wrap">
+  <header>
+    <p class="title">トレーニング記録</p>
+    <p class="sub">小さな積み重ねを続ける</p>
+  </header>
+
+  <section class="board">
+    <div class="streak-label">連続記録</div>
+    <div class="streak-num"><span id="streakNum">0</span><span class="unit">日</span></div>
+    <div class="streak-msg calm" id="streakMsg">今日から始めよう</div>
+  </section>
+
+  <section class="menu" id="menuCard">
+    <div class="menu-nav">
+      <button class="mnav" id="menuPrev" aria-label="前の曜日">‹</button>
+      <div class="menu-head" id="menuHead">今日のメニュー</div>
+      <button class="mnav" id="menuNext" aria-label="次の曜日">›</button>
+    </div>
+    <button class="menu-today" id="menuToday" hidden>今日へ戻る</button>
+    <div class="mode-switch" id="modeSwitch">
+      <button class="mode-btn" id="modeStation" data-mode="station">ステーション</button>
+      <button class="mode-btn" id="modeCircuit" data-mode="circuit">サーキット</button>
+    </div>
+    <div class="circuit-note" id="circuitNote" hidden></div>
+    <div class="menu-body" id="menuBody"></div>
+    <div class="menu-done" id="menuDone" hidden>🎉 今日のメニュー完了!</div>
+  </section>
+
+  <button class="cta" id="cta">今日やった</button>
+  <button class="undo" id="undo" hidden>今日の記録を取り消す</button>
+
+  <div class="stats">
+    <div class="stat"><div class="n" id="monthCount">0</div><div class="l">今月</div></div>
+    <div class="stat"><div class="n" id="totalCount">0</div><div class="l">累計</div></div>
+    <div class="stat"><div class="n" id="bestCount">0</div><div class="l">自己ベスト</div></div>
+  </div>
+
+  <div class="cal-head">
+    <button class="nav" id="prev" aria-label="前の月">‹</button>
+    <div class="cal-title" id="calTitle">2026年8月</div>
+    <button class="nav" id="next" aria-label="次の月">›</button>
+  </div>
+  <div class="dow">
+    <div class="sun">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div>
+  </div>
+  <div class="grid" id="grid"></div>
+
+  <section class="chart-card">
+    <div class="chart-title">月別の実施回数(直近6か月)</div>
+    <div class="chart" id="chart"></div>
+  </section>
+
+  <section class="backup">
+    <button class="bk-btn" id="exportBtn">記録を書き出し</button>
+    <button class="bk-btn" id="importBtn">記録を読み込み</button>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+  </section>
+
+  <footer>
+    記録はこの端末のブラウザ内に保存されます。<br>
+    <span class="footer-note">機種変更・別ブラウザには引き継がれません</span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORE_KEY = "training-habit-v1";
+  var CHECK_KEY = "training-habit-checks-v1";
+  var storageOK = true;
+
+  // ---- 保存/読み込み ----
+  function load(){
+    try{
+      var raw = localStorage.getItem(STORE_KEY);
+      if(!raw) return {};
+      var obj = JSON.parse(raw);
+      return (obj && typeof obj === "object") ? obj : {};
+    }catch(e){ storageOK = false; return {}; }
+  }
+  function save(map){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(map)); }
+    catch(e){ storageOK = false; }
+  }
+
+  // ---- 種目チェックの保存/読み込み(日付ごと・その日限り) ----
+  function loadAllChecks(){
+    try{
+      var raw = localStorage.getItem(CHECK_KEY);
+      if(!raw) return {};
+      var obj = JSON.parse(raw);
+      return (obj && typeof obj === "object") ? obj : {};
+    }catch(e){ return {}; }
+  }
+  function saveAllChecks(obj){
+    try{ localStorage.setItem(CHECK_KEY, JSON.stringify(obj)); }
+    catch(e){ /* 保存失敗は致命的でないので無視 */ }
+  }
+
+  // ---- トレーニングモード(station/circuit)の読み書き ----
+  function loadMode(){
+    try{
+      var m = localStorage.getItem(MODE_KEY);
+      return (m === "circuit") ? "circuit" : "station"; // 既定はステーション
+    }catch(e){ return "station"; }
+  }
+  function saveMode(m){
+    try{ localStorage.setItem(MODE_KEY, m); }
+    catch(e){ /* 保存失敗は無視 */ }
+  }
+
+  // ---- 日付ユーティリティ(すべてローカル時刻基準) ----
+  function toKey(d){
+    var y=d.getFullYear();
+    var m=String(d.getMonth()+1).padStart(2,"0");
+    var day=String(d.getDate()).padStart(2,"0");
+    return y+"-"+m+"-"+day;
+  }
+  function keyToDate(k){
+    var p=k.split("-").map(Number);
+    return new Date(p[0], p[1]-1, p[2]);
+  }
+  function todayDate(){
+    var n=new Date();
+    return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  }
+  // 実在する日付キー(YYYY-MM-DD)かを検証(13月・32日などを弾く)
+  function isValidDateKey(k){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(k)) return false;
+    var p = k.split("-").map(Number);
+    var d = new Date(p[0], p[1]-1, p[2]);
+    return d.getFullYear()===p[0] && d.getMonth()===p[1]-1 && d.getDate()===p[2];
+  }
+
+  // ---- ストリーク(1日の休みは許容、2日連続で途切れる) ----
+  function calcStreak(map, today){
+    var todayKey = toKey(today);
+    var y = new Date(today); y.setDate(y.getDate()-1);
+    var yKey = toKey(y);
+
+    var cursor;
+    if(map[todayKey]) cursor = keyToDate(todayKey);
+    else if(map[yKey]) cursor = keyToDate(yKey);
+    else return 0;
+
+    var count = 1;
+    while(true){
+      var found = null;
+      for(var gap=1; gap<=2; gap++){
+        var prev = new Date(cursor); prev.setDate(prev.getDate()-gap);
+        if(map[toKey(prev)]){ found = prev; break; }
+      }
+      if(!found) break;
+      count++; cursor = found;
+    }
+    return count;
+  }
+
+  // ---- 自己ベスト(全期間の最長ストリーク。1日休みは継続) ----
+  function bestStreak(map){
+    var keys = Object.keys(map).sort(); // YYYY-MM-DD は文字列ソートで日付順
+    if(keys.length===0) return 0;
+    var best=1, cur=1;
+    for(var i=1;i<keys.length;i++){
+      var gap = Math.round((keyToDate(keys[i]) - keyToDate(keys[i-1]))/86400000);
+      if(gap<=2) cur++; else cur=1;
+      if(cur>best) best=cur;
+    }
+    return best;
+  }
+
+  // 節目の日数
+  var MILESTONES = [3,7,14,30,50,100];
+
+  // ---- 種目の説明 ----
+  var EXERCISES = {
+    "ブルガリアンスクワット":"片脚を後ろの台(イスなど)に乗せ、前脚で立つ。前脚の膝を曲げて腰を下ろし、まっすぐ戻る。下ろすのはゆっくり、上げるのは素早く。膝がつま先より前に出すぎないように。",
+    "サイドランジ":"足を大きく横に開いて立つ。片側の膝を曲げて腰を落とし、反対の脚は伸ばす。上体は前に倒しすぎない。左右交互に。",
+    "片脚ヒップリフト":"仰向けで両膝を立て、片脚を上げる。かかとで床を押し、お尻を持ち上げて下ろす。お尻を締めることを意識。",
+    "片脚カーフレイズ":"片脚で立ち、つま先立ちになってかかとを上げ下げ。ふらつくなら壁に軽く手を添える。",
+    "腕立て伏せ":"手を肩幅より少し広く床につき、体を一直線に保って胸を床に近づけ、押し戻す。きつければ膝を床につけて。",
+    "パイクプッシュアップ":"手と足を床につけ、お尻を高く上げて山型になる。頭を床に近づけるように肘を曲げて押し戻す。肩に効く。",
+    "YTWレイズ":"うつ伏せで腕を「Y・T・W」の形に順に上げる。肩甲骨を寄せる意識で、反動を使わずゆっくり。",
+    "四つ這い肩外旋":"横向きに寝て、脇を締め肘を90度に曲げる。前腕を天井方向に開いて戻す。軽い動きでOK。",
+    "素振り動作":"バットを振るように、腰の回転から上体をひねって鋭く振る。逆方向にも同じ回数。速く鋭くを意識。",
+    "自重ローテーショナルジャンプ":"半身に構え、腰の回転を使って90度ジャンプし反対向きに着地。着地はやわらかく。左右とも。",
+    "ジャンプスクワット":"しゃがんで真上に跳ぶ。着地は膝を軽く曲げて衝撃を吸収。連続で跳ばず1回ずつ丁寧に。",
+    "プランク":"うつ伏せで前腕とつま先で体を支え、頭からかかとまで一直線をキープ。腰を落とさない・上げすぎない。",
+    "サイドプランク":"横向きで片肘と足の側面で体を支え、体を一直線に。左右とも。",
+    "デッドバグ":"仰向けで両手両脚を上げ、対角の手脚をゆっくり伸ばして戻す。腰を反らさず床に密着させたまま。",
+    "バードドッグ":"四つ這いで対角の手脚をまっすぐ伸ばし、戻す。背中を反らさず水平を保つ。左右交互に。"
+  };
+
+  // ---- 曜日別プラン(0=日〜6=土)。repsは曜日ごとに設定 ----
+  var PLAN = {
+    0:{rest:true},
+    1:{label:"下半身", items:[
+      {name:"ブルガリアンスクワット", reps:"片脚8〜12回×3"},
+      {name:"サイドランジ", reps:"左右各10回×3"},
+      {name:"片脚ヒップリフト", reps:"左右各12回×3"},
+      {name:"片脚カーフレイズ", reps:"左右各20回×2"}
+    ]},
+    2:{label:"上半身+肩ケア", items:[
+      {name:"腕立て伏せ", reps:"10〜15回×3"},
+      {name:"パイクプッシュアップ", reps:"8〜10回×2"},
+      {name:"YTWレイズ", reps:"各10回×2"},
+      {name:"四つ這い肩外旋", reps:"左右各15回×2"}
+    ]},
+    3:{rest:true},
+    4:{label:"下半身+回旋", items:[
+      {name:"ブルガリアンスクワット", reps:"片脚8〜12回×3"},
+      {name:"サイドランジ", reps:"左右各10回×3"},
+      {name:"素振り動作", reps:"左右各15回×2"},
+      {name:"プランク", reps:"45〜60秒×2"}
+    ]},
+    5:{label:"体幹+肩ケア", items:[
+      {name:"プランク", reps:"45〜60秒×3"},
+      {name:"サイドプランク", reps:"左右各30〜45秒×2"},
+      {name:"デッドバグ", reps:"左右各10回×3"},
+      {name:"バードドッグ", reps:"左右各10回×2"},
+      {name:"YTWレイズ", reps:"各10回×2"}
+    ]},
+    6:{label:"跳ぶ系+回旋", items:[
+      {name:"ジャンプスクワット", reps:"8〜10回×3"},
+      {name:"自重ローテーショナルジャンプ", reps:"左右各8回×3"}
+    ]}
+  };
+  var DOW_NAME = ["日","月","火","水","木","金","土"];
+
+  // ---- 種目ごとのセット間休憩の目安 ----
+  var REST_TIME = {
+    "ブルガリアンスクワット":"60〜90秒",
+    "ジャンプスクワット":"60〜90秒",
+    "サイドランジ":"45〜60秒",
+    "自重ローテーショナルジャンプ":"45〜60秒",
+    "素振り動作":"45〜60秒",
+    "片脚ヒップリフト":"30〜45秒",
+    "片脚カーフレイズ":"30秒",
+    "腕立て伏せ":"45〜60秒",
+    "パイクプッシュアップ":"45〜60秒",
+    "プランク":"30秒",
+    "サイドプランク":"30秒",
+    "デッドバグ":"30秒",
+    "バードドッグ":"30秒",
+    "YTWレイズ":"30秒",
+    "四つ這い肩外旋":"30秒"
+  };
+  // サーキット(1セットずつ回す)の設定
+  var CIRCUIT = { rounds:3, betweenExercises:"10〜20秒", betweenRounds:"30〜60秒" };
+  var MODE_KEY = "training-habit-mode-v1"; // "station" | "circuit"
+
+  // ---- 状態 ----
+  var data = load();
+  var viewYear, viewMonth; // 表示中のカレンダー年月
+  var viewDow; // 表示中のメニュー曜日(0=日〜6=土)
+
+  // ---- DOM ----
+  var el = {
+    streakNum: document.getElementById("streakNum"),
+    streakMsg: document.getElementById("streakMsg"),
+    cta: document.getElementById("cta"),
+    undo: document.getElementById("undo"),
+    monthCount: document.getElementById("monthCount"),
+    totalCount: document.getElementById("totalCount"),
+    bestCount: document.getElementById("bestCount"),
+    banner: document.getElementById("banner"),
+    menuCard: document.getElementById("menuCard"),
+    menuHead: document.getElementById("menuHead"),
+    menuBody: document.getElementById("menuBody"),
+    menuDone: document.getElementById("menuDone"),
+    menuPrev: document.getElementById("menuPrev"),
+    menuNext: document.getElementById("menuNext"),
+    menuToday: document.getElementById("menuToday"),
+    modeStation: document.getElementById("modeStation"),
+    modeCircuit: document.getElementById("modeCircuit"),
+    circuitNote: document.getElementById("circuitNote"),
+    calTitle: document.getElementById("calTitle"),
+    grid: document.getElementById("grid"),
+    prev: document.getElementById("prev"),
+    next: document.getElementById("next"),
+    chart: document.getElementById("chart"),
+    exportBtn: document.getElementById("exportBtn"),
+    importBtn: document.getElementById("importBtn"),
+    importFile: document.getElementById("importFile")
+  };
+
+  // ---- 描画 ----
+  function render(){
+    var today = todayDate();
+    var tKey = toKey(today);
+    var didToday = !!data[tKey];
+
+    // ストリーク
+    var s = calcStreak(data, today);
+    el.streakNum.textContent = s;
+
+    // メッセージ(2連休警告を含む)
+    var y = new Date(today); y.setDate(y.getDate()-1);
+    var didYesterday = !!data[toKey(y)];
+    var msg, calm=false;
+    if(didToday){
+      if(s>=2) msg = "この調子。途切れさせるな";
+      else msg = "よし。まず1日";
+    } else if(didYesterday && s>=1){
+      msg = "昨日までの連続が生きている。今日やれば継続";
+    } else if(!didYesterday && s===0 && Object.keys(data).length>0){
+      // 一昨日以前に記録があり、昨日サボっている → 今日休むと2連休
+      var yy = new Date(today); yy.setDate(yy.getDate()-2);
+      if(data[toKey(yy)]) msg = "ここが踏ん張りどころ。今日やらないと2連休";
+      else { msg = "今日から仕切り直そう"; calm=true; }
+    } else {
+      msg = "今日から始めよう"; calm=true;
+    }
+    el.streakMsg.textContent = msg;
+    el.streakMsg.className = "streak-msg" + (calm?" calm":"");
+
+    // ボタン
+    if(didToday){
+      el.cta.classList.add("done");
+      el.cta.innerHTML = '<span class="check">✓</span>今日は記録済み';
+      el.undo.hidden = false;
+    } else {
+      el.cta.classList.remove("done");
+      el.cta.textContent = "今日やった";
+      el.undo.hidden = true;
+    }
+
+    // 集計
+    var keys = Object.keys(data);
+    el.totalCount.textContent = keys.length;
+    var mPrefix = today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0");
+    el.monthCount.textContent = keys.filter(function(k){return k.indexOf(mPrefix)===0;}).length;
+    el.bestCount.textContent = bestStreak(data);
+
+    renderCalendar(today);
+    renderChart(today);
+  }
+
+  // ---- 月別実施回数の棒グラフ(直近6か月) ----
+  function renderChart(today){
+    var n = 6;
+    var labels = [];
+    var y = today.getFullYear(), m = today.getMonth();
+    for(var i=n-1;i>=0;i--){
+      var d = new Date(y, m-i, 1);
+      labels.push({
+        key: d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"),
+        text: (d.getMonth()+1)+"月"
+      });
+    }
+    var keys = Object.keys(data);
+    var counts = labels.map(function(lab){
+      return keys.filter(function(k){ return k.slice(0,7) === lab.key; }).length;
+    });
+    var max = Math.max.apply(null, counts);
+
+    var html = "";
+    for(var j=0;j<labels.length;j++){
+      var c = counts[j];
+      var h = (max>0 && c>0) ? Math.round(c/max*80) : 0; // 最大80px
+      var barCls = c>0 ? "bar" : "bar zero";
+      var barStyle = c>0 ? ("height:"+Math.max(h,3)+"px;") : "height:3px;";
+      html += '<div class="bar-col">'
+            +   '<div class="bar-val">'+c+'</div>'
+            +   '<div class="'+barCls+'" style="'+barStyle+'"></div>'
+            +   '<div class="bar-label">'+labels[j].text+'</div>'
+            + '</div>';
+    }
+    el.chart.innerHTML = html;
+  }
+
+  function renderCalendar(today){
+    el.calTitle.textContent = viewYear+"年"+(viewMonth+1)+"月";
+
+    var first = new Date(viewYear, viewMonth, 1);
+    var startDow = first.getDay(); // 0=日
+    var daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+    var tKey = toKey(today);
+
+    var html = "";
+    for(var i=0;i<startDow;i++) html += '<div class="cell empty"></div>';
+    for(var d=1; d<=daysInMonth; d++){
+      var dateObj = new Date(viewYear, viewMonth, d);
+      var k = toKey(dateObj);
+      var cls = "cell";
+      if(data[k]) cls += " done";
+      if(k===tKey) cls += " today";
+      html += '<div class="'+cls+'">'+d+'</div>';
+    }
+    el.grid.innerHTML = html;
+
+    // 未来の月へは進めない(今日を含む月まで)
+    var today0 = todayDate();
+    var isCurrentOrFuture = (viewYear>today0.getFullYear()) ||
+      (viewYear===today0.getFullYear() && viewMonth>=today0.getMonth());
+    el.next.disabled = isCurrentOrFuture;
+  }
+
+  // ---- メニュー描画(viewDowの曜日を表示。今日以外は閲覧のみ) ----
+  function renderMenu(){
+    var today = todayDate();
+    var todayDow = today.getDay();
+    var dow = viewDow;
+    var isToday = (dow === todayDow);
+    var plan = PLAN[dow];
+
+    el.menuBody.innerHTML = "";
+    el.menuDone.hidden = true;
+    el.menuToday.hidden = isToday; // 今日を見ているときは戻るボタン不要
+
+    // 見出しの接頭辞:今日なら「今日の」、それ以外は曜日名
+    var headPrefix = isToday ? "今日のメニュー" : (DOW_NAME[dow] + "曜日のメニュー");
+
+    if(plan.rest){
+      el.menuCard.classList.add("rest");
+      el.menuHead.textContent = headPrefix + "(回復日)";
+      var p = document.createElement("div");
+      p.className = "menu-rest-msg";
+      p.textContent = "回復日。軽くストレッチを。";
+      el.menuBody.appendChild(p);
+      return;
+    }
+
+    el.menuCard.classList.remove("rest");
+    el.menuHead.textContent = headPrefix + "(" + plan.label + ")";
+
+    // チェックは「今日」だけ有効。今日の記録に紐づく
+    var todayKey = toKey(today);
+    var allChecks = loadAllChecks();
+    var todayChecks = allChecks[todayKey] || {};
+
+    function persist(){
+      allChecks[todayKey] = todayChecks;
+      saveAllChecks(allChecks);
+    }
+    function updateDone(){
+      if(!isToday){ el.menuDone.hidden = true; return; }
+      var all = plan.items.every(function(it){ return todayChecks[it.name]; });
+      el.menuDone.hidden = !all;
+    }
+
+    plan.items.forEach(function(it){
+      var wrap = document.createElement("div");
+      wrap.className = "ex";
+
+      var row = document.createElement("div");
+      row.className = "ex-row";
+
+      // チェックボタンは今日のみ表示(他曜日は閲覧のみ)
+      if(isToday){
+        var on0 = !!todayChecks[it.name];
+        var chk = document.createElement("button");
+        chk.className = "chk" + (on0 ? " on" : "");
+        chk.setAttribute("role", "checkbox");
+        chk.setAttribute("aria-checked", on0 ? "true" : "false");
+        chk.setAttribute("aria-label", it.name);
+        chk.textContent = on0 ? "✓" : "";
+        chk.addEventListener("click", function(){
+          var on = !todayChecks[it.name];
+          if(on) todayChecks[it.name] = 1; else delete todayChecks[it.name];
+          chk.classList.toggle("on", on);
+          chk.textContent = on ? "✓" : "";
+          chk.setAttribute("aria-checked", on ? "true" : "false");
+          persist();
+          updateDone();
+        });
+        row.appendChild(chk);
+      }
+
+      var btn = document.createElement("button");
+      btn.className = "ex-btn";
+      btn.setAttribute("aria-expanded", "false");
+      var info = document.createElement("span");
+      info.className = "ex-info";
+      var nm = document.createElement("span");
+      nm.className = "ex-name";
+      nm.textContent = it.name;
+      var rp = document.createElement("span");
+      rp.className = "ex-reps";
+      // ステーション時はセット間休憩も表示。サーキット時は回数のみ
+      if(viewMode === "station" && REST_TIME[it.name]){
+        rp.textContent = it.reps + " / 休憩" + REST_TIME[it.name];
+      } else {
+        rp.textContent = it.reps;
+      }
+      info.appendChild(nm);
+      info.appendChild(rp);
+      var arw = document.createElement("span");
+      arw.className = "arw";
+      arw.textContent = "▶";
+      btn.appendChild(info);
+      btn.appendChild(arw);
+
+      var desc = document.createElement("div");
+      desc.className = "ex-desc";
+      desc.textContent = EXERCISES[it.name] || "";
+
+      btn.addEventListener("click", function(){
+        var open = desc.classList.toggle("open");
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+
+      row.appendChild(btn);
+      wrap.appendChild(row);
+      wrap.appendChild(desc);
+      el.menuBody.appendChild(wrap);
+    });
+
+    updateDone();
+  }
+
+  // ---- 演出 ----
+  var bannerTimer = null;
+  function showBanner(text){
+    el.banner.textContent = text;
+    el.banner.classList.add("show");
+    if(bannerTimer) clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(function(){
+      el.banner.classList.remove("show");
+    }, 2600);
+  }
+  function popStreak(){
+    el.streakNum.classList.remove("pop");
+    // リフローを挟んでアニメを確実に再生
+    void el.streakNum.offsetWidth;
+    el.streakNum.classList.add("pop");
+  }
+
+  // ---- 操作 ----
+  el.cta.addEventListener("click", function(){
+    var k = toKey(todayDate());
+    if(data[k]) return; // 二度押し防止
+    data[k] = 1;
+    save(data);
+    render();
+    // 押下後の現在ストリークで演出
+    var s = calcStreak(data, todayDate());
+    popStreak();
+    if(MILESTONES.indexOf(s) !== -1){
+      showBanner("🎉 " + s + "日達成!");
+    }
+  });
+  el.undo.addEventListener("click", function(){
+    var k = toKey(todayDate());
+    delete data[k];
+    save(data);
+    render();
+  });
+  el.prev.addEventListener("click", function(){
+    viewMonth--; if(viewMonth<0){viewMonth=11;viewYear--;}
+    renderCalendar(todayDate());
+  });
+  el.next.addEventListener("click", function(){
+    if(el.next.disabled) return;
+    viewMonth++; if(viewMonth>11){viewMonth=0;viewYear++;}
+    renderCalendar(todayDate());
+  });
+
+  // ---- バックアップ:書き出し ----
+  el.exportBtn.addEventListener("click", function(){
+    try{
+      var payload = { type:"training-habit-backup", version:1, records:data };
+      var blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "training-backup-" + toKey(todayDate()) + ".json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }catch(e){
+      alert("書き出しに失敗しました。\nこの端末・ブラウザがファイル保存に対応していない可能性があります。\nお手数ですが別のブラウザでお試しください。");
+    }
+  });
+
+  // ---- バックアップ:読み込み(マージ) ----
+  el.importBtn.addEventListener("click", function(){
+    el.importFile.click();
+  });
+  el.importFile.addEventListener("change", function(e){
+    var file = e.target.files && e.target.files[0];
+    e.target.value = ""; // 同じファイルを再選択してもchangeが発火するように
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      var incoming;
+      try{
+        var obj = JSON.parse(reader.result);
+        // 新形式(records配下)・旧形式(生map)の両対応
+        incoming = (obj && typeof obj === "object" && obj.records && typeof obj.records === "object")
+          ? obj.records : obj;
+      }catch(err){
+        alert("読み込めませんでした。\n原因:ファイルがJSON形式として壊れています。\n対処:このアプリで書き出したバックアップファイルを選んでください。");
+        return;
+      }
+      if(!incoming || typeof incoming !== "object"){
+        alert("読み込めませんでした。\n原因:記録データが見つかりません。\n対処:このアプリで書き出したバックアップファイルを選んでください。");
+        return;
+      }
+      // 実在する日付(YYYY-MM-DD)のキーだけを採用
+      var validKeys = Object.keys(incoming).filter(function(k){
+        return isValidDateKey(k) && incoming[k];
+      });
+      if(validKeys.length === 0){
+        alert("読み込めませんでした。\n原因:有効な実施記録が1件も含まれていません。\n対処:このアプリで書き出したバックアップファイルを選んでください。");
+        return;
+      }
+      // 今ない日付が何件増えるか数える
+      var added = validKeys.filter(function(k){ return !data[k]; }).length;
+      var ok = confirm("バックアップから "+validKeys.length+" 日分の記録を読み込みます。\n今の記録に追加(マージ)します(新規 "+added+" 日分)。\nよろしいですか?");
+      if(!ok) return;
+      // マージ(和集合)
+      validKeys.forEach(function(k){ data[k] = 1; });
+      save(data);
+      render();
+      alert("読み込みが完了しました。新しく "+added+" 日分を追加しました。");
+    };
+    reader.onerror = function(){
+      alert("読み込めませんでした。\n原因:ファイルの読み取りに失敗しました。\n対処:もう一度ファイルを選び直してください。");
+    };
+    reader.readAsText(file);
+  });
+
+  // ---- メニューの曜日切り替え ----
+  el.menuPrev.addEventListener("click", function(){
+    viewDow = (viewDow + 6) % 7; // 前の曜日
+    renderMenu();
+  });
+  el.menuNext.addEventListener("click", function(){
+    viewDow = (viewDow + 1) % 7; // 次の曜日
+    renderMenu();
+  });
+  el.menuToday.addEventListener("click", function(){
+    viewDow = todayDate().getDay();
+    renderMenu();
+  });
+
+  // ---- ステーション/サーキット切り替え ----
+  el.modeStation.addEventListener("click", function(){
+    if(viewMode === "station") return;
+    viewMode = "station";
+    saveMode(viewMode);
+    renderMenu();
+  });
+  el.modeCircuit.addEventListener("click", function(){
+    if(viewMode === "circuit") return;
+    viewMode = "circuit";
+    saveMode(viewMode);
+    renderMenu();
+  });
+
+  // ---- 初期化 ----
+  // 過去日の種目チェックは不要なので今日の分だけ残す
+  (function cleanupChecks(){
+    var allc = loadAllChecks();
+    var tk = toKey(todayDate());
+    var changed = false;
+    Object.keys(allc).forEach(function(k){
+      if(k !== tk){ delete allc[k]; changed = true; }
+    });
+    if(changed) saveAllChecks(allc);
+  })();
+
+  var t = todayDate();
+  viewYear = t.getFullYear();
+  viewMonth = t.getMonth();
+  viewDow = t.getDay(); // メニューは今日の曜日から開始
+  viewMode = loadMode(); // 保存されたモード(既定:ステーション)
+  render();
+  renderMenu();
+
+  if(!storageOK){
+    el.streakMsg.textContent = "※このブラウザでは記録の保存ができません";
+    el.streakMsg.className = "streak-msg calm";
+  }
+})();
+</script>
+</body>
+</html>
