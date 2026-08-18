@@ -437,7 +437,7 @@
 
   </div><!-- /paneLog -->
 
-  <footer>
+  <footer id="footerNote">
     記録はこの端末のブラウザ内に保存されます。<br>
     <span class="footer-note">機種変更・別ブラウザには引き継がれません</span>
   </footer>
@@ -813,6 +813,7 @@
     weekChart: document.getElementById("weekChart"),
     exportBtn: document.getElementById("exportBtn"),
     syncStatus: document.getElementById("syncStatus"),
+    footerNote: document.getElementById("footerNote"),
     signInBtn: document.getElementById("signInBtn"),
     syncActions: document.getElementById("syncActions"),
     syncNowBtn: document.getElementById("syncNowBtn"),
@@ -1241,6 +1242,14 @@
       + String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
   }
   function renderSyncUI(){
+    // ログインしていれば他端末に引き継がれるので、フッターの案内も切り替える
+    if(currentUser){
+      el.footerNote.innerHTML = "記録はこの端末とクラウドの両方に保存されます。<br>"
+        + '<span class="footer-note">同じGoogleアカウントでログインした端末に引き継がれます</span>';
+    } else {
+      el.footerNote.innerHTML = "記録はこの端末のブラウザ内に保存されます。<br>"
+        + '<span class="footer-note">機種変更・別ブラウザには引き継がれません</span>';
+    }
     if(!fb){
       setSyncStatus("この端末では同期を利用できません。<br>通信環境を確認して再読み込みしてください。", true);
       el.signInBtn.hidden = true;
