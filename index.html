@@ -108,6 +108,16 @@
   .undo:active{color:var(--ink-dim);}
   .undo[hidden]{display:none;}
 
+  /* 昨日の記録(押し忘れ用) */
+  .yday{
+    display:block;width:100%;margin:10px auto 0;padding:12px;
+    background:transparent;border:1px dashed #3a4553;border-radius:12px;
+    color:var(--ink-dim);font-size:14px;cursor:pointer;font-family:inherit;
+  }
+  .yday:active{background:#1b2129;}
+  .yday.done{border-style:solid;border-color:#2a323d;color:var(--line-dim);font-size:13px;}
+  .yday[hidden]{display:none;}
+
   /* 今日のメニュー */
   .menu{
     margin-top:16px;background:var(--field2);border:1px solid #2a323d;
@@ -354,6 +364,7 @@
 
   <button class="cta" id="cta">今日やった</button>
   <button class="undo" id="undo" hidden>今日の記録を取り消す</button>
+  <button class="yday" id="yday"></button>
 
   <div class="stats">
     <div class="stat"><div class="n" id="monthCount">0</div><div class="l">今月</div></div>
@@ -640,6 +651,7 @@
     streakMsg: document.getElementById("streakMsg"),
     cta: document.getElementById("cta"),
     undo: document.getElementById("undo"),
+    yday: document.getElementById("yday"),
     monthCount: document.getElementById("monthCount"),
     totalCount: document.getElementById("totalCount"),
     bestCount: document.getElementById("bestCount"),
@@ -712,6 +724,17 @@
       el.cta.classList.remove("done");
       el.cta.textContent = "今日やった";
       el.undo.hidden = true;
+    }
+
+    // 昨日の記録ボタン(押し忘れ対応。遡れるのは昨日まで)
+    var yd = new Date(today); yd.setDate(yd.getDate()-1);
+    var ydLabel = (yd.getMonth()+1) + "/" + yd.getDate() + " " + DOW_NAME[yd.getDay()];
+    if(data[toKey(yd)]){
+      el.yday.classList.add("done");
+      el.yday.textContent = "昨日(" + ydLabel + ")は記録済み — 取り消す";
+    } else {
+      el.yday.classList.remove("done");
+      el.yday.textContent = "昨日(" + ydLabel + ")の分を記録する";
     }
 
     // 集計
@@ -1078,6 +1101,23 @@
     delete data[k];
     save(data);
     render();
+  });
+  el.yday.addEventListener("click", function(){
+    var yd = new Date(todayDate()); yd.setDate(yd.getDate()-1);
+    var k = toKey(yd);
+    if(data[k]){
+      delete data[k];          // 記録済みなら取り消し
+    } else {
+      data[k] = 1;             // 未記録なら記録
+    }
+    save(data);
+    render();
+    if(data[k]){
+      // 昨日を足したことで今日までの連続記録が伸びる場合の演出
+      var s = calcStreak(data, todayDate());
+      popStreak();
+      if(MILESTONES.indexOf(s) !== -1) showBanner("🎉 " + s + "日達成!");
+    }
   });
   el.prev.addEventListener("click", function(){
     viewMonth--; if(viewMonth<0){viewMonth=11;viewYear--;}
