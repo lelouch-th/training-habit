@@ -43,6 +43,21 @@
   }
   .sub{font-size:12px;color:var(--line-dim);letter-spacing:.15em;}
 
+  /* タブ */
+  .tabs{
+    display:flex;gap:0;background:#161b23;border:1px solid #2a323d;
+    border-radius:12px;padding:4px;margin-bottom:16px;
+  }
+  .tab{
+    flex:1;background:transparent;border:none;color:var(--ink-dim);
+    font-size:14px;font-weight:700;padding:11px;border-radius:9px;cursor:pointer;
+    letter-spacing:.12em;
+  }
+  .tab.active{background:var(--accent);color:#0e2419;}
+  .pane[hidden]{display:none;}
+  /* 記録タブ先頭のカレンダーは上余白を詰める */
+  .pane .cal-head:first-child{margin-top:4px;}
+
   /* スコアボード風ストリーク */
   .board{
     background:linear-gradient(180deg,var(--field2),#161b23);
@@ -234,8 +249,35 @@
     background:var(--accent);min-height:3px;transition:height .3s ease;
   }
   .bar.zero{background:#2a323d;}
+  .bar.rest-dow{background:#3a4553;}
   .bar-label{font-size:11px;color:var(--line-dim);}
+  .bar-label.rest-dow{color:#455160;}
+  /* 8本並ぶグラフは幅が狭いので間隔と文字を詰める */
+  .chart-8{gap:5px;}
+  .chart-8 .bar{max-width:26px;}
+  .chart-8 .bar-label{font-size:10px;letter-spacing:-.02em;}
+  .chart-8 .bar-val{font-size:11px;}
   @media (prefers-reduced-motion: reduce){ .bar{transition:none;} }
+
+  /* 今週の達成状況 */
+  .week-dots{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:14px;}
+  .wd{display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .wd-name{font-size:11px;color:var(--line-dim);}
+  .wd-name.rest-dow{color:#455160;}
+  .wd-dot{
+    width:100%;max-width:36px;aspect-ratio:1/1;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-variant-numeric:tabular-nums;
+    border:1.5px solid #3a4553;background:transparent;color:var(--ink-dim);
+  }
+  .wd-dot.done{background:var(--accent);border-color:var(--accent);color:#0e2419;font-weight:800;font-size:15px;}
+  .wd-dot.rest{border-color:transparent;background:#242c37;color:#5c6672;font-size:11px;}
+  .wd-dot.future{border-style:dashed;border-color:#333d4a;color:var(--line-dim);}
+  .wd-dot.miss{border-color:#6b4a4a;color:#a07575;}
+  .wd-dot.today{outline:2px solid var(--accent-soft);outline-offset:2px;}
+  .week-sum{font-size:13px;color:var(--ink-dim);text-align:center;line-height:1.8;}
+  .week-sum b{color:var(--accent-soft);font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;}
+  .week-sum .extra{display:block;font-size:12px;color:var(--line-dim);}
 
   /* バックアップ */
   .backup{display:flex;gap:12px;margin-top:16px;}
@@ -281,6 +323,13 @@
     <p class="sub">小さな積み重ねを続ける</p>
   </header>
 
+  <nav class="tabs" role="tablist" aria-label="表示切り替え">
+    <button class="tab active" id="tabToday" role="tab" aria-selected="true" aria-controls="paneToday">今日</button>
+    <button class="tab" id="tabLog" role="tab" aria-selected="false" aria-controls="paneLog">記録</button>
+  </nav>
+
+  <div class="pane" id="paneToday" role="tabpanel" aria-labelledby="tabToday">
+
   <section class="board">
     <div class="streak-label">連続記録</div>
     <div class="streak-num"><span id="streakNum">0</span><span class="unit">日</span></div>
@@ -312,6 +361,10 @@
     <div class="stat"><div class="n" id="bestCount">0</div><div class="l">自己ベスト</div></div>
   </div>
 
+  </div><!-- /paneToday -->
+
+  <div class="pane" id="paneLog" role="tabpanel" aria-labelledby="tabLog" hidden>
+
   <div class="cal-head">
     <button class="nav" id="prev" aria-label="前の月">‹</button>
     <div class="cal-title" id="calTitle">2026年8月</div>
@@ -327,11 +380,29 @@
     <div class="chart" id="chart"></div>
   </section>
 
+  <section class="chart-card">
+    <div class="chart-title">曜日別の実施率(直近4週)</div>
+    <div class="chart" id="dowChart"></div>
+  </section>
+
+  <section class="chart-card">
+    <div class="chart-title">今週の達成状況</div>
+    <div class="week-dots" id="weekDots"></div>
+    <div class="week-sum" id="weekSum"></div>
+  </section>
+
+  <section class="chart-card">
+    <div class="chart-title">週別の実施回数(直近8週)</div>
+    <div class="chart chart-8" id="weekChart"></div>
+  </section>
+
   <section class="backup">
     <button class="bk-btn" id="exportBtn">記録を書き出し</button>
     <button class="bk-btn" id="importBtn">記録を読み込み</button>
     <input type="file" id="importFile" accept="application/json,.json" hidden>
   </section>
+
+  </div><!-- /paneLog -->
 
   <footer>
     記録はこの端末のブラウザ内に保存されます。<br>
@@ -410,6 +481,14 @@
     return d.getFullYear()===p[0] && d.getMonth()===p[1]-1 && d.getDate()===p[2];
   }
 
+  // その日が属する週の月曜日を返す(週は月曜始まり)
+  function mondayOf(d){
+    var x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    var w = x.getDay();                  // 0=日
+    x.setDate(x.getDate() + (w===0 ? -6 : 1-w));
+    return x;
+  }
+
   // ---- ストリーク(1日の休みは許容、2日連続で途切れる) ----
   function calcStreak(map, today){
     var todayKey = toKey(today);
@@ -471,39 +550,43 @@
 
   // ---- 曜日別プラン(0=日〜6=土)。repsは曜日ごとに設定 ----
   var PLAN = {
-    0:{rest:true},
-    1:{label:"下半身", items:[
-      {name:"ブルガリアンスクワット", reps:"片脚8〜12回×3"},
-      {name:"サイドランジ", reps:"左右各10回×3"},
-      {name:"片脚ヒップリフト", reps:"左右各12回×3"},
-      {name:"片脚カーフレイズ", reps:"左右各20回×2"}
-    ]},
-    2:{label:"上半身+肩ケア", items:[
-      {name:"腕立て伏せ", reps:"10〜15回×3"},
-      {name:"パイクプッシュアップ", reps:"8〜10回×2"},
-      {name:"YTWレイズ", reps:"各10回×2"},
-      {name:"四つ這い肩外旋", reps:"左右各15回×2"}
-    ]},
-    3:{rest:true},
-    4:{label:"下半身+回旋", items:[
-      {name:"ブルガリアンスクワット", reps:"片脚8〜12回×3"},
-      {name:"サイドランジ", reps:"左右各10回×3"},
-      {name:"素振り動作", reps:"左右各15回×2"},
-      {name:"プランク", reps:"45〜60秒×2"}
-    ]},
-    5:{label:"体幹+肩ケア", items:[
+    0:{label:"体幹+肩ケア", items:[
       {name:"プランク", reps:"45〜60秒×3"},
       {name:"サイドプランク", reps:"左右各30〜45秒×2"},
       {name:"デッドバグ", reps:"左右各10回×3"},
       {name:"バードドッグ", reps:"左右各10回×2"},
       {name:"YTWレイズ", reps:"各10回×2"}
     ]},
+    1:{label:"下半身", items:[
+      {name:"ブルガリアンスクワット", reps:"片脚8〜12回×3"},
+      {name:"サイドランジ", reps:"左右各10回×3"},
+      {name:"片脚ヒップリフト", reps:"左右各12回×3"},
+      {name:"片脚カーフレイズ", reps:"左右各20回×2"}
+    ]},
+    2:{rest:true},
+    3:{label:"上半身+肩ケア", items:[
+      {name:"腕立て伏せ", reps:"10〜15回×3"},
+      {name:"パイクプッシュアップ", reps:"8〜10回×2"},
+      {name:"YTWレイズ", reps:"各10回×2"},
+      {name:"四つ這い肩外旋", reps:"左右各15回×2"}
+    ]},
+    4:{label:"下半身+回旋", items:[
+      {name:"ブルガリアンスクワット", reps:"片脚8〜12回×3"},
+      {name:"サイドランジ", reps:"左右各10回×3"},
+      {name:"素振り動作", reps:"左右各15回×2"},
+      {name:"プランク", reps:"45〜60秒×2"}
+    ]},
+    5:{rest:true},
     6:{label:"跳ぶ系+回旋", items:[
       {name:"ジャンプスクワット", reps:"8〜10回×3"},
       {name:"自重ローテーショナルジャンプ", reps:"左右各8回×3"}
     ]}
   };
   var DOW_NAME = ["日","月","火","水","木","金","土"];
+  // 月曜始まりで並べたときの曜日番号(0=日〜6=土)
+  var DOW_ORDER_MON = [1,2,3,4,5,6,0];
+  // その曜日が休み(回復日)かどうか
+  function isRestDow(dow){ return !!(PLAN[dow] && PLAN[dow].rest); }
 
   // ---- 種目ごとのセット間休憩の目安 ----
   var REST_TIME = {
@@ -523,8 +606,26 @@
     "YTWレイズ":"30秒",
     "四つ這い肩外旋":"30秒"
   };
-  // サーキット(1セットずつ回す)の設定
-  var CIRCUIT = { rounds:3, betweenExercises:"10〜20秒", betweenRounds:"30〜60秒" };
+  // サーキット(1セットずつ回す)の設定。周回数はプランのセット数から自動算出する
+  var CIRCUIT = { betweenExercises:"10〜20秒", betweenRounds:"30〜60秒" };
+
+  // reps文字列を「回数部分」と「セット数」に分ける
+  // 例:"片脚8〜12回×3" → {base:"片脚8〜12回", sets:3} / 「×N」がなければ sets:1
+  function splitSets(reps){
+    var m = String(reps).match(/^(.*?)×(\d+)$/);
+    if(!m) return { base:String(reps), sets:1 };
+    return { base:m[1], sets:Number(m[2]) };
+  }
+  // そのプランをサーキットで回すときの周回数(=最も多いセット数)
+  function circuitRounds(plan){
+    if(!plan || !plan.items) return 1;
+    var max = 1;
+    plan.items.forEach(function(it){
+      var s = splitSets(it.reps).sets;
+      if(s > max) max = s;
+    });
+    return max;
+  }
   var MODE_KEY = "training-habit-mode-v1"; // "station" | "circuit"
 
   // ---- 状態 ----
@@ -543,6 +644,10 @@
     totalCount: document.getElementById("totalCount"),
     bestCount: document.getElementById("bestCount"),
     banner: document.getElementById("banner"),
+    tabToday: document.getElementById("tabToday"),
+    tabLog: document.getElementById("tabLog"),
+    paneToday: document.getElementById("paneToday"),
+    paneLog: document.getElementById("paneLog"),
     menuCard: document.getElementById("menuCard"),
     menuHead: document.getElementById("menuHead"),
     menuBody: document.getElementById("menuBody"),
@@ -551,6 +656,7 @@
     menuNext: document.getElementById("menuNext"),
     menuToday: document.getElementById("menuToday"),
     modeStation: document.getElementById("modeStation"),
+    modeSwitch: document.getElementById("modeSwitch"),
     modeCircuit: document.getElementById("modeCircuit"),
     circuitNote: document.getElementById("circuitNote"),
     calTitle: document.getElementById("calTitle"),
@@ -558,6 +664,10 @@
     prev: document.getElementById("prev"),
     next: document.getElementById("next"),
     chart: document.getElementById("chart"),
+    dowChart: document.getElementById("dowChart"),
+    weekDots: document.getElementById("weekDots"),
+    weekSum: document.getElementById("weekSum"),
+    weekChart: document.getElementById("weekChart"),
     exportBtn: document.getElementById("exportBtn"),
     importBtn: document.getElementById("importBtn"),
     importFile: document.getElementById("importFile")
@@ -613,6 +723,9 @@
 
     renderCalendar(today);
     renderChart(today);
+    renderDowChart(today);
+    renderWeekStatus(today);
+    renderWeekChart(today);
   }
 
   // ---- 月別実施回数の棒グラフ(直近6か月) ----
@@ -646,6 +759,107 @@
             + '</div>';
     }
     el.chart.innerHTML = html;
+  }
+
+  // ---- 曜日別の実施率(直近4週=今日を含む28日) ----
+  function renderDowChart(today){
+    var num = [0,0,0,0,0,0,0]; // 実施した日数
+    var den = [0,0,0,0,0,0,0]; // 対象になった日数
+    for(var i=0;i<28;i++){
+      var d = new Date(today); d.setDate(d.getDate()-i);
+      var w = d.getDay();
+      den[w]++;
+      if(data[toKey(d)]) num[w]++;
+    }
+    var html = "";
+    for(var j=0;j<7;j++){
+      var w2 = DOW_ORDER_MON[j];                 // 月→日の順で並べる
+      var rate = den[w2]>0 ? Math.round(num[w2]/den[w2]*100) : 0;
+      var rest = isRestDow(w2);
+      var h = Math.round(rate/100*80);           // 100%=80px
+      var barCls = "bar" + (rate>0 ? (rest ? " rest-dow" : "") : " zero");
+      var barStyle = "height:" + (rate>0 ? Math.max(h,3) : 3) + "px;";
+      var labCls = "bar-label" + (rest ? " rest-dow" : "");
+      html += '<div class="bar-col">'
+            +   '<div class="bar-val">'+rate+'%</div>'
+            +   '<div class="'+barCls+'" style="'+barStyle+'"></div>'
+            +   '<div class="'+labCls+'">'+DOW_NAME[w2]+'</div>'
+            + '</div>';
+    }
+    el.dowChart.innerHTML = html;
+  }
+
+  // ---- 今週の達成状況(月曜始まり。トレ予定日の達成を数える) ----
+  function renderWeekStatus(today){
+    var mon = mondayOf(today);
+    var tKey = toKey(today);
+    var planned = 0, achieved = 0, extra = 0;
+    var html = "";
+
+    for(var i=0;i<7;i++){
+      var d = new Date(mon); d.setDate(d.getDate()+i);
+      var k = toKey(d);
+      var w = d.getDay();
+      var rest = isRestDow(w);
+      var done = !!data[k];
+      // 今日はまだ実施できるので「これから(点線)」扱い。赤枠は過去の未実施だけ
+      var pending = d.getTime() >= today.getTime();
+
+      if(!rest) planned++;
+      if(done){ if(rest) extra++; else achieved++; }
+
+      var cls = "wd-dot";
+      if(done) cls += " done";
+      else if(rest) cls += " rest";
+      else if(pending) cls += " future";
+      else cls += " miss";
+      if(k === tKey) cls += " today";
+
+      var mark = done ? "✓" : (rest ? "休" : String(d.getDate()));
+      html += '<div class="wd">'
+            +   '<span class="wd-name'+(rest?" rest-dow":"")+'">'+DOW_NAME[w]+'</span>'
+            +   '<span class="'+cls+'">'+mark+'</span>'
+            + '</div>';
+    }
+
+    el.weekDots.innerHTML = html;
+    var sum = 'トレ予定 '+planned+'日中 <b>'+achieved+'</b> 日達成';
+    if(extra > 0) sum += '<span class="extra">休み日も '+extra+' 日実施</span>';
+    el.weekSum.innerHTML = sum;
+  }
+
+  // ---- 週別の実施回数(今週を含む直近8週。週は月曜始まり) ----
+  function renderWeekChart(today){
+    var thisMon = mondayOf(today);
+    var weeks = [];
+    for(var i=7;i>=0;i--){
+      var s = new Date(thisMon); s.setDate(s.getDate()-i*7);
+      weeks.push(s);
+    }
+    var counts = weeks.map(function(s){
+      var c = 0;
+      for(var j=0;j<7;j++){
+        var d = new Date(s); d.setDate(d.getDate()+j);
+        if(data[toKey(d)]) c++;
+      }
+      return c;
+    });
+    var max = Math.max.apply(null, counts);
+
+    var html = "";
+    for(var k=0;k<weeks.length;k++){
+      var c2 = counts[k];
+      var h = (max>0 && c2>0) ? Math.round(c2/max*80) : 0;   // 最大80px
+      var barCls = c2>0 ? "bar" : "bar zero";
+      var barStyle = "height:" + (c2>0 ? Math.max(h,3) : 3) + "px;";
+      var lab = (weeks[k].getMonth()+1) + "/" + weeks[k].getDate();
+      html += '<div class="bar-col">'
+            +   '<div class="bar-val">'+c2+'</div>'
+            +   '<div class="'+barCls+'" style="'+barStyle+'"></div>'
+            +   '<div class="bar-label">'+lab+'</div>'
+            + '</div>';
+    }
+    el.weekChart.innerHTML = html;
   }
 
   function renderCalendar(today){
@@ -687,17 +901,39 @@
     el.menuDone.hidden = true;
     el.menuToday.hidden = isToday; // 今日を見ているときは戻るボタン不要
 
+    // 選択中のモードをボタンの見た目に反映
+    var isCircuit = (viewMode === "circuit");
+    el.modeStation.classList.toggle("active", !isCircuit);
+    el.modeCircuit.classList.toggle("active", isCircuit);
+    el.modeStation.setAttribute("aria-pressed", isCircuit ? "false" : "true");
+    el.modeCircuit.setAttribute("aria-pressed", isCircuit ? "true" : "false");
+
     // 見出しの接頭辞:今日なら「今日の」、それ以外は曜日名
     var headPrefix = isToday ? "今日のメニュー" : (DOW_NAME[dow] + "曜日のメニュー");
 
     if(plan.rest){
       el.menuCard.classList.add("rest");
       el.menuHead.textContent = headPrefix + "(回復日)";
+      el.modeSwitch.hidden = true;   // 回復日はモード切替・案内を出さない
+      el.circuitNote.hidden = true;
       var p = document.createElement("div");
       p.className = "menu-rest-msg";
       p.textContent = "回復日。軽くストレッチを。";
       el.menuBody.appendChild(p);
       return;
+    }
+
+    el.modeSwitch.hidden = false;
+    // サーキット時だけ、回し方の案内を表示(周回数はプランのセット数から算出)
+    var rounds = circuitRounds(plan);
+    if(isCircuit){
+      el.circuitNote.innerHTML =
+        "全種目を1セットずつ順に行い、最大<b>" + rounds + "周</b>。<br>" +
+        "各種目の「◯周目まで」に従い、達したものは以降スキップ。<br>" +
+        "種目のあいだ<b>" + CIRCUIT.betweenExercises + "</b> / 1周終えたら<b>" + CIRCUIT.betweenRounds + "</b>休む。";
+      el.circuitNote.hidden = false;
+    } else {
+      el.circuitNote.hidden = true;
     }
 
     el.menuCard.classList.remove("rest");
@@ -756,8 +992,12 @@
       nm.textContent = it.name;
       var rp = document.createElement("span");
       rp.className = "ex-reps";
-      // ステーション時はセット間休憩も表示。サーキット時は回数のみ
-      if(viewMode === "station" && REST_TIME[it.name]){
+      if(isCircuit){
+        // サーキット:セット数を周回数として表示(例「片脚8〜12回 · 3周目まで」)
+        var sp = splitSets(it.reps);
+        rp.textContent = sp.base + " · " + sp.sets + "周目まで";
+      } else if(REST_TIME[it.name]){
+        // ステーション:セット間休憩も表示
         rp.textContent = it.reps + " / 休憩" + REST_TIME[it.name];
       } else {
         rp.textContent = it.reps;
@@ -804,6 +1044,20 @@
     void el.streakNum.offsetWidth;
     el.streakNum.classList.add("pop");
   }
+
+  // ---- タブ切り替え ----
+  function switchTab(name){
+    var toToday = (name !== "log");
+    el.paneToday.hidden = !toToday;
+    el.paneLog.hidden = toToday;
+    el.tabToday.classList.toggle("active", toToday);
+    el.tabLog.classList.toggle("active", !toToday);
+    el.tabToday.setAttribute("aria-selected", toToday ? "true" : "false");
+    el.tabLog.setAttribute("aria-selected", toToday ? "false" : "true");
+    window.scrollTo(0, 0);
+  }
+  el.tabToday.addEventListener("click", function(){ switchTab("today"); });
+  el.tabLog.addEventListener("click", function(){ switchTab("log"); });
 
   // ---- 操作 ----
   el.cta.addEventListener("click", function(){
