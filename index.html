@@ -289,6 +289,18 @@
   .week-sum b{color:var(--accent-soft);font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;}
   .week-sum .extra{display:block;font-size:12px;color:var(--line-dim);}
 
+  /* 端末間の同期 */
+  .sync{
+    margin-top:16px;background:var(--field2);border:1px solid #2a323d;
+    border-radius:16px;padding:16px;
+  }
+  .sync-title{font-size:12px;letter-spacing:.14em;color:var(--line-dim);margin-bottom:10px;}
+  .sync-status{font-size:13px;color:var(--ink-dim);line-height:1.7;margin-bottom:12px;word-break:break-all;}
+  .sync-status b{color:var(--accent-soft);font-weight:700;}
+  .sync-status.err{color:#c98a8a;}
+  .sync-actions{display:flex;gap:12px;}
+  .sync .bk-btn{padding:11px;font-size:13px;}
+
   /* バックアップ */
   .backup{display:flex;gap:12px;margin-top:16px;}
   .bk-btn{
@@ -407,6 +419,16 @@
     <div class="chart chart-8" id="weekChart"></div>
   </section>
 
+  <section class="sync" id="syncCard">
+    <div class="sync-title">端末間の同期</div>
+    <div class="sync-status" id="syncStatus">準備中…</div>
+    <button class="bk-btn" id="signInBtn" hidden>Googleでログインして同期</button>
+    <div class="sync-actions" id="syncActions" hidden>
+      <button class="bk-btn" id="syncNowBtn">今すぐ同期</button>
+      <button class="bk-btn" id="signOutBtn">ログアウト</button>
+    </div>
+  </section>
+
   <section class="backup">
     <button class="bk-btn" id="exportBtn">記録を書き出し</button>
     <button class="bk-btn" id="importBtn">記録を読み込み</button>
@@ -421,13 +443,89 @@
   </footer>
 </div>
 
+<!-- Firebase(端末間同期用)。読み込めない場合もアプリは端末内保存で動作する -->
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore-compat.js"></script>
 <script>
 (function(){
   "use strict";
 
   var STORE_KEY = "training-habit-v1";
   var CHECK_KEY = "training-habit-checks-v1";
+  var LOG_KEY   = "training-habit-log-v1";   // 同期用の操作ログ
   var storageOK = true;
+
+  // ---- Firebase(端末間同期) ----
+  // apiKeyは公開されても問題ない識別子。保護はFirestoreのセキュリティルールが担う
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDcujwB_PmE33L4PZZJwobJQc-7zTvc0zk",
+    authDomain: "todo-app-3ccea.firebaseapp.com",
+    projectId: "todo-app-3ccea",
+    storageBucket: "todo-app-3ccea.firebasestorage.app",
+    messagingSenderId: "352088559245",
+    appId: "1:352088559245:web:84c4fe55d7ea16eedddcc4"
+  };
+  var fb = null;   // { auth, db } SDKが使えないときはnullのまま
+  function initFirebase(){
+    if(typeof firebase === "undefined" || !firebase.initializeApp) return null;
+    try{
+      var app = firebase.apps && firebase.apps.length
+        ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
+      return { auth: firebase.auth(), db: firebase.firestore(), app: app };
+    }catch(e){
+      return null;
+    }
+  }
+
+  // ---- 同期用の操作ログ ----
+  // 形式: { "2026-08-17": {v:1, t:1755...}, "2026-08-16": {v:0, t:1755...} }
+  //   v:1=記録あり / v:0=取り消し済み  t=操作した時刻(ミリ秒)
+  // 「取り消し」も履歴として残すことで、他端末から記録が復活するのを防ぐ
+  function loadLog(){
+    try{
+      var raw = localStorage.getItem(LOG_KEY);
+      if(!raw) return null;
+      var obj = JSON.parse(raw);
+      return (obj && typeof obj === "object") ? obj : null;
+    }catch(e){ return null; }
+  }
+  function saveLog(log){
+    try{ localStorage.setItem(LOG_KEY, JSON.stringify(log)); }
+    catch(e){ storageOK = false; }
+  }
+  // 既存の記録(日付キーだけのmap)から操作ログを作る。初回移行用
+  function logFromRecords(map){
+    var log = {};
+    Object.keys(map).forEach(function(k){
+      if(isValidDateKey(k) && map[k]) log[k] = { v:1, t:0 }; // t=0は「最も古い操作」
+    });
+    return log;
+  }
+  // 操作ログ → 実際の記録map(v:1のものだけ)
+  function recordsFromLog(log){
+    var map = {};
+    Object.keys(log).forEach(function(k){
+      if(log[k] && log[k].v === 1) map[k] = 1;
+    });
+    return map;
+  }
+  // 2つの操作ログを統合。同じ日付は「操作時刻が新しい方」を採用する
+  function mergeLogs(a, b){
+    var out = {};
+    function put(log){
+      Object.keys(log).forEach(function(k){
+        var e = log[k];
+        if(!e || typeof e !== "object" || (e.v !== 0 && e.v !== 1)) return;
+        if(!isValidDateKey(k)) return;
+        var t = (typeof e.t === "number" && isFinite(e.t)) ? e.t : 0;
+        if(!out[k] || t > out[k].t) out[k] = { v:e.v, t:t };
+      });
+    }
+    put(a || {});
+    put(b || {});
+    return out;
+  }
 
   // ---- 保存/読み込み ----
   function load(){
@@ -556,7 +654,13 @@
     "プランク":"うつ伏せで前腕とつま先で体を支え、頭からかかとまで一直線をキープ。腰を落とさない・上げすぎない。",
     "サイドプランク":"横向きで片肘と足の側面で体を支え、体を一直線に。左右とも。",
     "デッドバグ":"仰向けで両手両脚を上げ、対角の手脚をゆっくり伸ばして戻す。腰を反らさず床に密着させたまま。",
-    "バードドッグ":"四つ這いで対角の手脚をまっすぐ伸ばし、戻す。背中を反らさず水平を保つ。左右交互に。"
+    "バードドッグ":"四つ這いで対角の手脚をまっすぐ伸ばし、戻す。背中を反らさず水平を保つ。左右交互に。",
+    "キャット&カウ":"四つ這いになり、息を吐きながら背中を丸めて天井へ突き上げる。次に息を吸いながら背中を反らせて胸を張る。この往復をゆっくり繰り返す。首の力は抜いたまま。",
+    "チャイルドポーズ":"正座から上体を前に倒し、両腕を前に伸ばして額を床につける。お尻はかかとに近づけたまま。背中と腰が伸びるのを感じながら、深く呼吸を続ける。",
+    "ハムストリングス伸ばし":"仰向けで片脚を天井方向へ上げ、太ももの裏を両手で抱えて手前に引き寄せる。膝は軽く曲がっていてよい。反対の脚は床につけたまま。痛みではなく心地よい張りを感じる強さで。",
+    "股関節まわし":"立ったまま片膝を腰の高さまで上げ、外側に大きく開いて下ろす。次は逆回し(外から内へ)も同数。軸足がぐらつくときは壁や机に手を添える。",
+    "胸開きストレッチ":"壁や柱に手のひらと前腕をつけ、体を反対方向へゆっくりひねる。胸の前側が伸びる位置で止めて呼吸。肩に痛みが出る手前まで。",
+    "首・肩まわし":"肩をすくめて大きく後ろに回す。次に首をゆっくり左右に倒し、前後にも動かす。首を勢いよく一周させるのは避け、ゆっくり動かす。"
   };
 
   // ---- 曜日別プラン(0=日〜6=土)。repsは曜日ごとに設定 ----
@@ -574,7 +678,14 @@
       {name:"片脚ヒップリフト", reps:"左右各12回×3"},
       {name:"片脚カーフレイズ", reps:"左右各20回×2"}
     ]},
-    2:{rest:true},
+    2:{rest:true, items:[
+      {name:"ふくらはぎ・アキレス腱伸ばし", reps:"左右各30秒"},
+      {name:"股関節前側のストレッチ", reps:"左右各30秒"},
+      {name:"お尻のストレッチ", reps:"左右各30秒"},
+      {name:"胸椎の回旋ストレッチ", reps:"左右各10回"},
+      {name:"胸・肩前側のストレッチ", reps:"左右各30秒"},
+      {name:"肩甲骨まわし", reps:"前後各10回"}
+    ]},
     3:{label:"上半身+肩ケア", items:[
       {name:"腕立て伏せ", reps:"10〜15回×3"},
       {name:"パイクプッシュアップ", reps:"8〜10回×2"},
@@ -594,6 +705,16 @@
     ]}
   };
   var DOW_NAME = ["日","月","火","水","木","金","土"];
+
+  // 回復日(火・金)に表示するストレッチ。記録やチェックの対象にはしない
+  var STRETCH = [
+    {name:"キャット&カウ", reps:"10往復"},
+    {name:"チャイルドポーズ", reps:"60秒"},
+    {name:"ハムストリングス伸ばし", reps:"左右各30秒"},
+    {name:"股関節まわし", reps:"左右各10回"},
+    {name:"胸開きストレッチ", reps:"左右各30秒"},
+    {name:"首・肩まわし", reps:"各10回"}
+  ];
   // 月曜始まりで並べたときの曜日番号(0=日〜6=土)
   var DOW_ORDER_MON = [1,2,3,4,5,6,0];
   // その曜日が休み(回復日)かどうか
@@ -641,6 +762,16 @@
 
   // ---- 状態 ----
   var data = load();
+  var opLog = loadLog() || logFromRecords(data);   // 初回はいまの記録から作る
+
+  // 記録の追加/取り消しはこの関数に集約する(操作ログとクラウド保存を必ず伴わせるため)
+  function setRecord(key, on, skipPush){
+    if(on) data[key] = 1; else delete data[key];
+    opLog[key] = { v: on ? 1 : 0, t: Date.now() };
+    save(data);
+    saveLog(opLog);
+    if(!skipPush) pushToCloud();
+  }
   var viewYear, viewMonth; // 表示中のカレンダー年月
   var viewDow; // 表示中のメニュー曜日(0=日〜6=土)
   var viewMode; // 表示中のトレーニングモード("station" | "circuit")
@@ -681,6 +812,11 @@
     weekSum: document.getElementById("weekSum"),
     weekChart: document.getElementById("weekChart"),
     exportBtn: document.getElementById("exportBtn"),
+    syncStatus: document.getElementById("syncStatus"),
+    signInBtn: document.getElementById("signInBtn"),
+    syncActions: document.getElementById("syncActions"),
+    syncNowBtn: document.getElementById("syncNowBtn"),
+    signOutBtn: document.getElementById("signOutBtn"),
     importBtn: document.getElementById("importBtn"),
     importFile: document.getElementById("importFile")
   };
@@ -941,8 +1077,48 @@
       el.circuitNote.hidden = true;
       var p = document.createElement("div");
       p.className = "menu-rest-msg";
-      p.textContent = "回復日。軽くストレッチを。";
+      p.textContent = "回復日。下のストレッチを気が向いた分だけ。記録の対象外です。";
       el.menuBody.appendChild(p);
+
+      // ストレッチ一覧(チェックボックスなし。解説だけ開閉できる)
+      STRETCH.forEach(function(it){
+        var wrapS = document.createElement("div");
+        wrapS.className = "ex";
+        var rowS = document.createElement("div");
+        rowS.className = "ex-row";
+
+        var btnS = document.createElement("button");
+        btnS.className = "ex-btn";
+        btnS.setAttribute("aria-expanded", "false");
+        var infoS = document.createElement("span");
+        infoS.className = "ex-info";
+        var nmS = document.createElement("span");
+        nmS.className = "ex-name";
+        nmS.textContent = it.name;
+        var rpS = document.createElement("span");
+        rpS.className = "ex-reps";
+        rpS.textContent = it.reps;
+        infoS.appendChild(nmS);
+        infoS.appendChild(rpS);
+        var arwS = document.createElement("span");
+        arwS.className = "arw";
+        arwS.textContent = "▶";
+        btnS.appendChild(infoS);
+        btnS.appendChild(arwS);
+
+        var descS = document.createElement("div");
+        descS.className = "ex-desc";
+        descS.textContent = EXERCISES[it.name] || "";
+        btnS.addEventListener("click", function(){
+          var openS = descS.classList.toggle("open");
+          btnS.setAttribute("aria-expanded", openS ? "true" : "false");
+        });
+
+        rowS.appendChild(btnS);
+        wrapS.appendChild(rowS);
+        wrapS.appendChild(descS);
+        el.menuBody.appendChild(wrapS);
+      });
       return;
     }
 
@@ -1051,6 +1227,108 @@
     updateDone();
   }
 
+  // ---- 端末間の同期 ----
+  var currentUser = null;
+  var syncing = false;
+  var lastSyncAt = null;
+
+  function setSyncStatus(text, isErr){
+    el.syncStatus.innerHTML = text;
+    el.syncStatus.className = "sync-status" + (isErr ? " err" : "");
+  }
+  function fmtTime(d){
+    return (d.getMonth()+1)+"/"+d.getDate()+" "
+      + String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+  }
+  function renderSyncUI(){
+    if(!fb){
+      setSyncStatus("この端末では同期を利用できません。<br>通信環境を確認して再読み込みしてください。", true);
+      el.signInBtn.hidden = true;
+      el.syncActions.hidden = true;
+      return;
+    }
+    if(currentUser){
+      el.signInBtn.hidden = true;
+      el.syncActions.hidden = false;
+      var t = syncing ? "同期中…"
+        : (lastSyncAt ? "最終同期 <b>" + fmtTime(lastSyncAt) + "</b>" : "未同期");
+      setSyncStatus(currentUser.email + "<br>" + t);
+    } else {
+      el.signInBtn.hidden = false;
+      el.syncActions.hidden = true;
+      setSyncStatus("未ログイン。記録はこの端末にのみ保存されます。<br>ログインすると他の端末と記録を共有できます。");
+    }
+  }
+
+  // クラウドへ送信(ログイン時のみ)
+  function pushToCloud(){
+    if(!fb || !currentUser) return;
+    fb.db.collection("training").doc(currentUser.uid)
+      .set({ log: opLog, updatedAt: Date.now() })
+      .then(function(){
+        lastSyncAt = new Date();
+        renderSyncUI();
+      })
+      .catch(function(e){
+        setSyncStatus("保存に失敗しました。<br>" + (e && e.message ? e.message : ""), true);
+      });
+  }
+
+  // クラウドと統合(取得 → マージ → 反映 → 送信)
+  function syncWithCloud(){
+    if(!fb || !currentUser || syncing) return;
+    syncing = true;
+    renderSyncUI();
+    fb.db.collection("training").doc(currentUser.uid).get()
+      .then(function(snap){
+        var remote = (snap.exists && snap.data() && snap.data().log) ? snap.data().log : {};
+        var merged = mergeLogs(opLog, remote);
+        opLog = merged;
+        data = recordsFromLog(merged);
+        save(data);
+        saveLog(opLog);
+        render();
+        renderMenu();
+        return fb.db.collection("training").doc(currentUser.uid)
+          .set({ log: opLog, updatedAt: Date.now() });
+      })
+      .then(function(){
+        syncing = false;
+        lastSyncAt = new Date();
+        renderSyncUI();
+      })
+      .catch(function(e){
+        syncing = false;
+        setSyncStatus("同期に失敗しました。<br>" + (e && e.message ? e.message : ""), true);
+      });
+  }
+
+  fb = initFirebase();
+  if(fb){
+    fb.auth.onAuthStateChanged(function(user){
+      currentUser = user || null;
+      renderSyncUI();
+      if(currentUser) syncWithCloud();
+    });
+    el.signInBtn.addEventListener("click", function(){
+      var provider = new firebase.auth.GoogleAuthProvider();
+      fb.auth.signInWithPopup(provider).catch(function(e){
+        // ポップアップが塞がれる環境ではリダイレクト方式に切り替える
+        if(e && (e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment")){
+          fb.auth.signInWithRedirect(provider);
+          return;
+        }
+        if(e && e.code === "auth/popup-closed-by-user") return; // 利用者が閉じただけ
+        setSyncStatus("ログインに失敗しました。<br>" + (e && e.message ? e.message : ""), true);
+      });
+    });
+    el.signOutBtn.addEventListener("click", function(){
+      fb.auth.signOut().catch(function(){});
+    });
+    el.syncNowBtn.addEventListener("click", syncWithCloud);
+  }
+  renderSyncUI();
+
   // ---- 演出 ----
   var bannerTimer = null;
   function showBanner(text){
@@ -1086,8 +1364,7 @@
   el.cta.addEventListener("click", function(){
     var k = toKey(todayDate());
     if(data[k]) return; // 二度押し防止
-    data[k] = 1;
-    save(data);
+    setRecord(k, true);
     render();
     // 押下後の現在ストリークで演出
     var s = calcStreak(data, todayDate());
@@ -1098,19 +1375,13 @@
   });
   el.undo.addEventListener("click", function(){
     var k = toKey(todayDate());
-    delete data[k];
-    save(data);
+    setRecord(k, false);
     render();
   });
   el.yday.addEventListener("click", function(){
     var yd = new Date(todayDate()); yd.setDate(yd.getDate()-1);
     var k = toKey(yd);
-    if(data[k]){
-      delete data[k];          // 記録済みなら取り消し
-    } else {
-      data[k] = 1;             // 未記録なら記録
-    }
-    save(data);
+    setRecord(k, !data[k]);   // 記録済みなら取り消し、未記録なら記録
     render();
     if(data[k]){
       // 昨日を足したことで今日までの連続記録が伸びる場合の演出
@@ -1184,8 +1455,8 @@
       var ok = confirm("バックアップから "+validKeys.length+" 日分の記録を読み込みます。\n今の記録に追加(マージ)します(新規 "+added+" 日分)。\nよろしいですか?");
       if(!ok) return;
       // マージ(和集合)
-      validKeys.forEach(function(k){ data[k] = 1; });
-      save(data);
+      validKeys.forEach(function(k){ setRecord(k, true, true); }); // 送信は後でまとめて1回
+      pushToCloud();
       render();
       alert("読み込みが完了しました。新しく "+added+" 日分を追加しました。");
     };
