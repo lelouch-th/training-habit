@@ -193,6 +193,13 @@
     padding:0 2px 14px 36px;
   }
   .ex-desc.open{display:block;}
+  .ex-desc-text{margin:0 0 10px;}
+  .ex-video{
+    display:inline-block;color:var(--accent-soft);font-size:13px;
+    text-decoration:none;border:1px solid #2f4a3c;border-radius:9px;
+    padding:7px 12px;background:#1a2620;
+  }
+  .ex-video:active{background:#22332b;}
   .menu-done{
     text-align:center;color:var(--accent-soft);font-size:13px;
     font-weight:700;padding:10px 0 6px;
@@ -1107,9 +1114,7 @@
         btnS.appendChild(infoS);
         btnS.appendChild(arwS);
 
-        var descS = document.createElement("div");
-        descS.className = "ex-desc";
-        descS.textContent = EXERCISES[it.name] || "";
+        var descS = buildDesc(it.name);
         btnS.addEventListener("click", function(){
           var openS = descS.classList.toggle("open");
           btnS.setAttribute("aria-expanded", openS ? "true" : "false");
@@ -1210,9 +1215,7 @@
       btn.appendChild(info);
       btn.appendChild(arw);
 
-      var desc = document.createElement("div");
-      desc.className = "ex-desc";
-      desc.textContent = EXERCISES[it.name] || "";
+      var desc = buildDesc(it.name);
 
       btn.addEventListener("click", function(){
         var open = desc.classList.toggle("open");
@@ -1337,6 +1340,37 @@
     el.syncNowBtn.addEventListener("click", syncWithCloud);
   }
   renderSyncUI();
+
+  // 種目の解説欄を作る(解説文 + YouTube検索リンク)
+  // 個別の動画URLではなく検索リンクにすることで、動画が削除されてもリンク切れしない
+  function buildDesc(name){
+    var box = document.createElement("div");
+    box.className = "ex-desc";
+
+    var p = document.createElement("p");
+    p.className = "ex-desc-text";
+    p.textContent = EXERCISES[name] || "";
+    box.appendChild(p);
+
+    var a = document.createElement("a");
+    a.className = "ex-video";
+    // ストレッチとトレーニングで検索語を変える(「ストレッチのフォーム」は不自然なため)
+    var isStretch = STRETCH.some(function(s){ return s.name === name; });
+    var suffix;
+    if(!isStretch)                       suffix = " フォーム やり方";
+    else if(name.indexOf("ストレッチ") >= 0) suffix = " やり方";   // 名前に含まれる場合は重複させない
+    else                                 suffix = " ストレッチ やり方";
+    var q = name + suffix;
+    a.href = "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = "▶ 参考動画を検索する";
+    // リンクを押したときに解説の開閉が起きないようにする
+    a.addEventListener("click", function(ev){ ev.stopPropagation(); });
+    box.appendChild(a);
+
+    return box;
+  }
 
   // ---- 演出 ----
   var bannerTimer = null;
