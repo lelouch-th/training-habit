@@ -199,15 +199,30 @@
   }
   .ex-desc.open{display:block;}
   .ex-desc-text{margin:0 0 10px;}
-  .ex-effect{
-    margin:0 0 12px;padding:9px 11px;background:#1a2620;
-    border-radius:9px;font-size:12.5px;line-height:1.7;color:var(--ink-dim);
+  .ex-effect-btn{
+    display:flex;align-items:center;gap:8px;width:100%;
+    margin:0 0 10px;padding:8px 10px;background:#1a2620;
+    border:1px solid #2a3a32;border-radius:9px;cursor:pointer;
+    font-family:inherit;text-align:left;
   }
+  .ex-effect-btn:active{background:#22332b;}
   .ex-effect-label{
-    display:inline-block;margin-right:8px;padding:1px 7px;border-radius:5px;
+    flex:0 0 auto;padding:1px 7px;border-radius:5px;
     background:#2f4a3c;color:var(--accent-soft);font-size:11px;font-weight:700;
-    letter-spacing:.08em;vertical-align:1px;
+    letter-spacing:.08em;
   }
+  .ex-effect-more{flex:1 1 auto;font-size:12px;color:var(--line-dim);}
+  .ex-effect-arw{
+    flex:0 0 auto;font-size:9px;color:var(--line-dim);
+    transition:transform .15s ease;
+  }
+  .ex-effect-btn.open .ex-effect-arw{transform:rotate(90deg);}
+  .ex-effect-body{
+    display:none;margin:-4px 0 12px;padding:10px 11px;
+    background:#1a2620;border-radius:9px;
+    font-size:12.5px;line-height:1.75;color:var(--ink-dim);
+  }
+  .ex-effect-body.open{display:block;}
   .ex-video{
     display:inline-block;color:var(--accent-soft);font-size:13px;
     text-decoration:none;border:1px solid #2f4a3c;border-radius:9px;
@@ -1133,6 +1148,8 @@
 
         var descS = buildDesc(it.name);
         btnS.addEventListener("click", function(){
+          var willOpen = !descS.classList.contains("open");
+          if(willOpen) closeOtherDescs(btnS);   // 開くときだけ、他を閉じる
           var openS = descS.classList.toggle("open");
           btnS.setAttribute("aria-expanded", openS ? "true" : "false");
         });
@@ -1235,6 +1252,8 @@
       var desc = buildDesc(it.name);
 
       btn.addEventListener("click", function(){
+        var willOpen = !desc.classList.contains("open");
+        if(willOpen) closeOtherDescs(btn);   // 開くときだけ、他を閉じる
         var open = desc.classList.toggle("open");
         btn.setAttribute("aria-expanded", open ? "true" : "false");
       });
@@ -1376,8 +1395,43 @@
     "ブルガリアンスクワット":"太もも前(大腿四頭筋)とお尻(大臀筋)。片脚ずつ行うので左右の筋力差が是正され、バランス能力も同時に鍛えられる。両脚のスクワットより1本あたりの負荷が高い。",
     "サイドランジ":"内もも(内転筋)とお尻の側面(中臀筋)。横方向の動きを鍛える数少ない種目で、前後の動きだけでは鍛えられない部分を補う。守備の横の一歩や切り返しに効く。",
     "素振り動作":"腹斜筋を中心とした回旋の筋力と、下半身から上半身への力の伝達。筋肉を大きくするというより、力を無駄なく伝える動作を身につける種目。",
-    "プランク":"体幹全体(腹横筋・腹直筋・背筋)。姿勢を保つ力が付き、他のすべての種目の土台になる。腰への負担が少ないのも利点。"
+    "プランク":"体幹全体(腹横筋・腹直筋・背筋)。姿勢を保つ力が付き、他のすべての種目の土台になる。腰への負担が少ないのも利点。",
+    "片脚ヒップリフト":"お尻(大臀筋)と太もも裏(ハムストリングス)。座っている時間が長いと使われにくいお尻を目覚めさせる。腰痛の予防にもつながる。",
+    "片脚カーフレイズ":"ふくらはぎ(下腿三頭筋)。足首の安定性が上がり、走る・跳ぶ動作の土台になる。捻挫の予防にも役立つ。",
+    "腕立て伏せ":"胸(大胸筋)、肩の前(三角筋前部)、二の腕の裏(上腕三頭筋)。体を一直線に保つため体幹も同時に使う、上半身の基本種目。",
+    "パイクプッシュアップ":"肩(三角筋の前部・中部)。腕立て伏せより肩に体重が乗るので、器具なしで肩を集中的に鍛えられる数少ない種目。",
+    "YTWレイズ":"背中の中央(僧帽筋の中部・下部、菱形筋)。肩甲骨を寄せる筋力が付き、猫背・巻き肩の改善につながる。投球時の肩の安定にも直結する。",
+    "横向き肩外旋":"肩の奥のインナーマッスル(棘下筋・小円筋)。外からは見えない小さな筋肉だが、肩関節を正しい位置に保つ役割があり、投げる動作による肩の故障予防に重要。",
+    "ジャンプスクワット":"下半身の瞬発力。ゆっくり動くスクワットでは鍛えられない「素早く強い力を出す能力」を養う。走り出しや跳躍に効く。",
+    "自重ローテーショナルジャンプ":"跳ぶ力とひねる力の組み合わせ。空中での姿勢を保つ力と、着地で体を止める力が付く。方向転換の多い動きに効く。",
+    "サイドプランク":"脇腹(腹斜筋)と体幹の側面。体が横に倒れるのを防ぐ力が付き、回旋動作の土台になる。プランクと組み合わせると体幹を多方向から鍛えられる。",
+    "デッドバグ":"手脚を動かしながら体幹をぶらさずに保つ力。腰を守ったまま鍛えられるので、腰に不安がある人でも取り組みやすい。",
+    "バードドッグ":"体幹の安定性とお尻・背中の筋力。対角の手脚を動かすため、実際のスポーツ動作に近い形で体幹を鍛えられる。",
+    "キャット&カウ":"背骨の柔軟性、特に胸椎(背中の中央)の動き。ここが硬いと体をひねる動作を腰が肩代わりしてしまい、腰痛の原因になる。",
+    "チャイルドポーズ":"背中から腰にかけての伸展と、緊張の緩和。呼吸を深くしやすく、トレーニング後の切り替えにも向く。",
+    "ハムストリングス伸ばし":"太もも裏の柔軟性。ここが硬いと骨盤が後ろに傾き、腰痛や前かがみ姿勢の原因になる。脚を後ろに伸ばす動きも出やすくなる。",
+    "股関節まわし":"股関節の可動域。股関節は体をひねる力の出どころなので、ここが動くほど回旋動作が楽になる。",
+    "胸開きストレッチ":"胸の前側(大胸筋・小胸筋)の柔軟性。ここが硬いと肩が前に巻き込まれ、腕を上げにくくなる。押す種目の後に入れると効果的。",
+    "首・肩まわし":"首と肩まわりの血流改善と緊張の緩和。デスクワークで固まりやすい部分をほぐし、肩の動きを取り戻す。"
   };
+
+  // 種目の解説を開くとき、他に開いている解説を閉じる(1つだけ開いた状態にする)
+  function closeOtherDescs(exceptBtn){
+    var btns = el.menuBody.querySelectorAll(".ex-btn");
+    for(var i=0;i<btns.length;i++){
+      if(btns[i] === exceptBtn) continue;
+      btns[i].setAttribute("aria-expanded", "false");
+      var wrap = btns[i].closest(".ex");
+      if(!wrap) continue;
+      var d = wrap.querySelector(".ex-desc");
+      if(d) d.classList.remove("open");
+      // 閉じるときは中の「効果」も畳んでおく(次に開いたとき初期状態に戻す)
+      var eb = wrap.querySelector(".ex-effect-body");
+      var ebtn = wrap.querySelector(".ex-effect-btn");
+      if(eb) eb.classList.remove("open");
+      if(ebtn){ ebtn.classList.remove("open"); ebtn.setAttribute("aria-expanded","false"); }
+    }
+  }
 
   // 種目の解説欄を作る(解説文 + YouTube検索リンク)
   // 個別の動画URLではなく検索リンクにすることで、動画が削除されてもリンク切れしない
@@ -1390,16 +1444,28 @@
     p.textContent = EXERCISES[name] || "";
     box.appendChild(p);
 
-    // 効果(登録がある種目だけ表示)
+    // 効果(登録がある種目だけ。最初は閉じておき、タップで開く)
     if(EFFECTS[name]){
-      var ef = document.createElement("p");
-      ef.className = "ex-effect";
-      var lb = document.createElement("span");
-      lb.className = "ex-effect-label";
-      lb.textContent = "効果";
-      ef.appendChild(lb);
-      ef.appendChild(document.createTextNode(EFFECTS[name]));
-      box.appendChild(ef);
+      var efBtn = document.createElement("button");
+      efBtn.className = "ex-effect-btn";
+      efBtn.setAttribute("aria-expanded", "false");
+      efBtn.innerHTML = '<span class="ex-effect-label">効果</span>'
+                      + '<span class="ex-effect-more">この種目で何が鍛えられる?</span>'
+                      + '<span class="ex-effect-arw">▶</span>';
+
+      var efBody = document.createElement("div");
+      efBody.className = "ex-effect-body";
+      efBody.textContent = EFFECTS[name];
+
+      efBtn.addEventListener("click", function(ev){
+        ev.stopPropagation();   // 解説そのものが閉じないようにする
+        var opened = efBody.classList.toggle("open");
+        efBtn.classList.toggle("open", opened);
+        efBtn.setAttribute("aria-expanded", opened ? "true" : "false");
+      });
+
+      box.appendChild(efBtn);
+      box.appendChild(efBody);
     }
 
     var a = document.createElement("a");
