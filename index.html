@@ -158,6 +158,11 @@
   }
   .circuit-note[hidden]{display:none;}
   .circuit-note b{color:var(--accent-soft);font-weight:700;}
+  .menu-aim{
+    font-size:12.5px;line-height:1.75;color:var(--ink-dim);
+    border-left:2px solid #2f4a3c;padding:2px 0 2px 10px;margin:0 0 12px;
+  }
+  .menu-aim[hidden]{display:none;}
   .menu-rest-msg{color:var(--ink-dim);font-size:14px;padding-bottom:12px;}
   .ex{
     border-top:1px solid #262e38;
@@ -372,6 +377,7 @@
       <button class="mnav" id="menuNext" aria-label="次の曜日">›</button>
     </div>
     <button class="menu-today" id="menuToday" hidden>今日へ戻る</button>
+    <div class="menu-aim" id="menuAim"></div>
     <div class="mode-switch" id="modeSwitch">
       <button class="mode-btn" id="modeStation" data-mode="station">ステーション</button>
       <button class="mode-btn" id="modeCircuit" data-mode="circuit">サーキット</button>
@@ -672,41 +678,34 @@
 
   // ---- 曜日別プラン(0=日〜6=土)。repsは曜日ごとに設定 ----
   var PLAN = {
-    0:{label:"体幹+肩ケア", items:[
+    0:{label:"体幹+肩ケア", aim:"全身をつなぐ体幹を多方向から固め、肩を整える日。負荷は中程度で、翌週に疲れを残さない締めくくり。", items:[
       {name:"プランク", reps:"45〜60秒×3"},
       {name:"サイドプランク", reps:"左右各30〜45秒×2"},
       {name:"デッドバグ", reps:"左右各10回×3"},
       {name:"バードドッグ", reps:"左右各10回×2"},
       {name:"YTWレイズ", reps:"各10回×2"}
     ]},
-    1:{label:"下半身", items:[
+    1:{label:"下半身", aim:"脚全体の筋力づくり。股関節・膝・足首すべてに刺激を入れる。すべて片脚ずつなので、左右差の是正とバランス能力も同時に鍛えられる。", items:[
       {name:"ブルガリアンスクワット", reps:"片脚8〜12回×3"},
       {name:"サイドランジ", reps:"左右各10回×3"},
       {name:"片脚ヒップリフト", reps:"左右各12回×3"},
       {name:"片脚カーフレイズ", reps:"左右各20回×2"}
     ]},
-    2:{rest:true, items:[
-      {name:"ふくらはぎ・アキレス腱伸ばし", reps:"左右各30秒"},
-      {name:"股関節前側のストレッチ", reps:"左右各30秒"},
-      {name:"お尻のストレッチ", reps:"左右各30秒"},
-      {name:"胸椎の回旋ストレッチ", reps:"左右各10回"},
-      {name:"胸・肩前側のストレッチ", reps:"左右各30秒"},
-      {name:"肩甲骨まわし", reps:"前後各10回"}
-    ]},
-    3:{label:"上半身+肩ケア", items:[
+    2:{rest:true, aim:"月曜の下半身の疲れを抜く日。筋肉は休んでいる間に回復して強くなるので、この日が筋力向上を支えている。"},
+    3:{label:"上半身+肩ケア", aim:"押す力を鍛えつつ、その裏側と肩の奥も同じ日に鍛える。押す種目だけだと肩が前に巻き込まれて故障しやすいため、バランスを取る構成。", items:[
       {name:"腕立て伏せ", reps:"10〜15回×3"},
       {name:"パイクプッシュアップ", reps:"8〜10回×2"},
       {name:"YTWレイズ", reps:"各10回×2"},
       {name:"横向き肩外旋", reps:"左右各15回×2"}
     ]},
-    4:{label:"下半身+回旋", items:[
+    4:{label:"下半身+回旋", aim:"月曜で作った脚の力を、上半身の回転に伝える動きを鍛える日。月曜が「筋力」なら、木曜は「使い方」を鍛える。", items:[
       {name:"ブルガリアンスクワット", reps:"片脚8〜12回×3"},
       {name:"サイドランジ", reps:"左右各10回×3"},
       {name:"素振り動作", reps:"左右各15回×2"},
       {name:"プランク", reps:"45〜60秒×2"}
     ]},
-    5:{rest:true},
-    6:{label:"跳ぶ系+回旋", items:[
+    5:{rest:true, aim:"水曜・木曜の疲れを抜いて、土日に備える日。金曜に休むことで、土曜の瞬発系トレーニングを疲れのない状態で行える。"},
+    6:{label:"跳ぶ系+回旋", aim:"素早く強い力を出す能力を鍛える日。瞬発系は疲れた状態だと質が落ちて怪我のリスクも上がるため、種目数を絞って質を優先する。", items:[
       {name:"ジャンプスクワット", reps:"8〜10回×3"},
       {name:"自重ローテーショナルジャンプ", reps:"左右各8回×3"}
     ]}
@@ -800,6 +799,7 @@
     paneLog: document.getElementById("paneLog"),
     menuCard: document.getElementById("menuCard"),
     menuHead: document.getElementById("menuHead"),
+    menuAim: document.getElementById("menuAim"),
     menuBody: document.getElementById("menuBody"),
     menuDone: document.getElementById("menuDone"),
     menuPrev: document.getElementById("menuPrev"),
@@ -1077,6 +1077,14 @@
 
     // 見出しの接頭辞:今日なら「今日の」、それ以外は曜日名
     var headPrefix = isToday ? "今日のメニュー" : (DOW_NAME[dow] + "曜日のメニュー");
+
+    // その日の狙い(回復日にも表示する)
+    if(plan.aim){
+      el.menuAim.textContent = plan.aim;
+      el.menuAim.hidden = false;
+    } else {
+      el.menuAim.hidden = true;
+    }
 
     if(plan.rest){
       el.menuCard.classList.add("rest");
