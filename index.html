@@ -199,6 +199,15 @@
   }
   .ex-desc.open{display:block;}
   .ex-desc-text{margin:0 0 10px;}
+  .ex-effect{
+    margin:0 0 12px;padding:9px 11px;background:#1a2620;
+    border-radius:9px;font-size:12.5px;line-height:1.7;color:var(--ink-dim);
+  }
+  .ex-effect-label{
+    display:inline-block;margin-right:8px;padding:1px 7px;border-radius:5px;
+    background:#2f4a3c;color:var(--accent-soft);font-size:11px;font-weight:700;
+    letter-spacing:.08em;vertical-align:1px;
+  }
   .ex-video{
     display:inline-block;color:var(--accent-soft);font-size:13px;
     text-decoration:none;border:1px solid #2f4a3c;border-radius:9px;
@@ -1362,6 +1371,14 @@
     "首・肩まわし":"首 肩 まわす ストレッチ やり方"
   };
 
+  // 種目ごとの効果(鍛えられる部位と、それが何の役に立つか)
+  var EFFECTS = {
+    "ブルガリアンスクワット":"太もも前(大腿四頭筋)とお尻(大臀筋)。片脚ずつ行うので左右の筋力差が是正され、バランス能力も同時に鍛えられる。両脚のスクワットより1本あたりの負荷が高い。",
+    "サイドランジ":"内もも(内転筋)とお尻の側面(中臀筋)。横方向の動きを鍛える数少ない種目で、前後の動きだけでは鍛えられない部分を補う。守備の横の一歩や切り返しに効く。",
+    "素振り動作":"腹斜筋を中心とした回旋の筋力と、下半身から上半身への力の伝達。筋肉を大きくするというより、力を無駄なく伝える動作を身につける種目。",
+    "プランク":"体幹全体(腹横筋・腹直筋・背筋)。姿勢を保つ力が付き、他のすべての種目の土台になる。腰への負担が少ないのも利点。"
+  };
+
   // 種目の解説欄を作る(解説文 + YouTube検索リンク)
   // 個別の動画URLではなく検索リンクにすることで、動画が削除されてもリンク切れしない
   function buildDesc(name){
@@ -1372,6 +1389,18 @@
     p.className = "ex-desc-text";
     p.textContent = EXERCISES[name] || "";
     box.appendChild(p);
+
+    // 効果(登録がある種目だけ表示)
+    if(EFFECTS[name]){
+      var ef = document.createElement("p");
+      ef.className = "ex-effect";
+      var lb = document.createElement("span");
+      lb.className = "ex-effect-label";
+      lb.textContent = "効果";
+      ef.appendChild(lb);
+      ef.appendChild(document.createTextNode(EFFECTS[name]));
+      box.appendChild(ef);
+    }
 
     var a = document.createElement("a");
     a.className = "ex-video";
