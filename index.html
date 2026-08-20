@@ -18,7 +18,8 @@
     --accent-soft:#6fd0a0;
     --done:#eef1f4;         /* やった日の丸 */
     --ink:#e7ebf0;          /* 明るい文字 */
-    --ink-dim:#8b95a3;      /* 弱い文字 */
+    --ink-dim:#8b95a3;      /* 弱い文字(ラベル・補助) */
+    --ink-read:#bcc6d2;     /* 読ませる文章用(長文でも疲れない明るさ) */
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;}
@@ -159,8 +160,8 @@
   .circuit-note[hidden]{display:none;}
   .circuit-note b{color:var(--accent-soft);font-weight:700;}
   .menu-aim{
-    font-size:12.5px;line-height:1.75;color:var(--ink-dim);
-    border-left:2px solid #2f4a3c;padding:2px 0 2px 10px;margin:0 0 12px;
+    font-size:13.5px;line-height:1.85;color:var(--ink-read);
+    border-left:2px solid #2f4a3c;padding:2px 0 2px 11px;margin:0 0 12px;
   }
   .menu-aim[hidden]{display:none;}
   .menu-rest-msg{color:var(--ink-dim);font-size:14px;padding-bottom:12px;}
@@ -194,11 +195,11 @@
   }
   .ex-btn[aria-expanded="true"] .arw{transform:rotate(90deg);color:var(--accent-soft);}
   .ex-desc{
-    display:none;color:var(--ink-dim);font-size:13px;line-height:1.7;
-    padding:0 2px 14px 36px;
+    display:none;color:var(--ink-read);font-size:14px;line-height:1.9;
+    padding:0 4px 14px 30px;
   }
   .ex-desc.open{display:block;}
-  .ex-desc-text{margin:0 0 10px;}
+  .ex-desc-text{margin:0 0 12px;}
   .ex-effect-btn{
     display:flex;align-items:center;gap:8px;width:100%;
     margin:0 0 10px;padding:8px 10px;background:#1a2620;
@@ -218,9 +219,9 @@
   }
   .ex-effect-btn.open .ex-effect-arw{transform:rotate(90deg);}
   .ex-effect-body{
-    display:none;margin:-4px 0 12px;padding:10px 11px;
+    display:none;margin:-4px 0 12px;padding:11px 12px;
     background:#1a2620;border-radius:9px;
-    font-size:12.5px;line-height:1.75;color:var(--ink-dim);
+    font-size:13.5px;line-height:1.9;color:var(--ink-read);
   }
   .ex-effect-body.open{display:block;}
   .ex-video{
